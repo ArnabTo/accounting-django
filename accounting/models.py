@@ -456,9 +456,20 @@ class Depreciation(models.Model):
     created_at = models.DateTimeField(default=timezone.now)
     updated_at = models.DateTimeField(default=timezone.now)
 
+# Billitems
+
+
+class BillItem(models.Model):
+    item = models.ManyToManyField(Item, blank=True)
+    description = models.TextField(null=True, blank=True)
+    quantity = models.IntegerField(default=1, null=True, blank=True)
+    cost = models.DecimalField(
+        max_digits=10, decimal_places=2, null=True, blank=True)
+    amount = models.DecimalField(
+        max_digits=10, decimal_places=2, null=True, blank=True)
+
+
 # Bills (Vendor Bills, similar to PurchaseInvoice but separate per description)
-
-
 class Bill(models.Model):
     BILL_TYPE_CHOICES = [
         ('withdrawal', 'Withdrawal'),
@@ -478,26 +489,15 @@ class Bill(models.Model):
         Account, on_delete=models.SET_NULL, null=True, blank=True, related_name='credit_bills')
     amount = models.DecimalField(max_digits=10, decimal_places=2)
     status = models.CharField(max_length=50, default='open')
-    items = models.ManyToManyField(
-        Item, through='BillItem')
+    items = models.ForeignKey(
+        BillItem, on_delete=models.CASCADE, related_name='billitems')
     bill_type = models.CharField(
         max_length=50, choices=BILL_TYPE_CHOICES, default='withdrawal')
     created_at = models.DateTimeField(default=timezone.now)
     updated_at = models.DateTimeField(default=timezone.now)
 
 
-class BillItem(models.Model):
-    bill = models.ForeignKey(Bill, on_delete=models.CASCADE)
-    item = models.ForeignKey(
-        Item, on_delete=models.CASCADE, null=True, blank=True)
-    description = models.TextField(null=True, blank=True)
-    quantity = models.IntegerField(default=1)
-    cost = models.DecimalField(max_digits=10, decimal_places=2)
-    amount = models.DecimalField(max_digits=10, decimal_places=2)
-
 # Checks
-
-
 class Check(models.Model):
     CHECK_TYPE_CHOICES = [
         ('withdrawal', 'Withdrawal'),
