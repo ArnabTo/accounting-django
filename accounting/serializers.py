@@ -274,6 +274,7 @@ class DepreciationSerializer(serializers.ModelSerializer):
 
 
 class BillItemSerializer(serializers.ModelSerializer):
+    bill = serializers.PrimaryKeyRelatedField(read_only=True)
     # accept item ID for posting
     item = serializers.PrimaryKeyRelatedField(
         queryset=Item.objects.all(), required=False, allow_null=True
@@ -281,6 +282,7 @@ class BillItemSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = BillItem
+        fields = '__all__'
 
 # Bill Serializer
 
