@@ -301,12 +301,29 @@ def capture_old_bill(sender, instance, **kwargs):
 @receiver(post_save, sender=Bill)
 def update_bill_balance(sender, instance, created, **kwargs):
     net_delta = instance.amount - instance._old_amount if not created else instance.amount
+
+    # Update account balances
     if instance.debit_account:
         update_account_balance(instance.debit_account,
                                net_delta)  # Debit expense/asset
     if instance.credit_account:
         update_account_balance(instance.credit_account,
                                net_delta)  # Credit payable
+
+    # Create corresponding bank transaction for new bills
+    if created:
+        withdrawal_amount = instance.amount if instance.bill_type == 'withdrawal' else 0
+        deposit_amount = instance.amount if instance.bill_type == 'deposit' else 0
+
+        BankTransaction.objects.create(
+            account=instance.credit_account,
+            date=instance.bill_date,
+            payee=instance.vendor,
+            description=instance.memo or f"Bill {instance.reference}",
+            withdrawal=withdrawal_amount,
+            deposit=deposit_amount,
+            status='pending'
+        )
 
 
 @receiver(pre_delete, sender=Bill)
@@ -337,7 +354,21 @@ def update_check_balance(sender, instance, created, **kwargs):
 
     if instance.pay_to:
         update_account_balance(instance.pay_to, net_delta)  # Increase pay_to
-    # Could decrease payable if linked to Bill
+
+    # Create corresponding bank transaction for new checks
+    if created:
+        withdrawal_amount = instance.amount if instance.check_type == 'withdrawal' else 0
+        deposit_amount = instance.amount if instance.check_type == 'deposit' else 0
+
+        BankTransaction.objects.create(
+            account=instance.bank_account,
+            date=instance.date,
+            payee=instance.vendor,
+            description=instance.memo or f"Check #{instance.check_number}",
+            withdrawal=withdrawal_amount,
+            deposit=deposit_amount,
+            status='pending'
+        )
 
 
 @receiver(pre_delete, sender=Check)

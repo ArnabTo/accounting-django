@@ -44,19 +44,23 @@ class AccountSerializer(serializers.ModelSerializer):
             'status',
         ]
 
-
-# BankTransaction Serializer
-class BankTransactionSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = BankTransaction
-        fields = '__all__'
-
 # Party Serializer
 
 
 class PartySerializer(serializers.ModelSerializer):
     class Meta:
         model = Party
+        fields = '__all__'
+
+# BankTransaction Serializer
+
+
+class BankTransactionSerializer(serializers.ModelSerializer):
+    payee = PartySerializer()
+    account = AccountSerializer()
+
+    class Meta:
+        model = BankTransaction
         fields = '__all__'
 
 # Item Serializer
@@ -88,6 +92,9 @@ class InvoiceItemSerializer(serializers.ModelSerializer):
 
 class SalesInvoiceSerializer(serializers.ModelSerializer):
     items = InvoiceItemSerializer(many=True, read_only=True)
+    customer = PartySerializer()
+    debit_account = AccountSerializer()
+    credit_account = AccountSerializer()
 
     class Meta:
         model = SalesInvoice
@@ -263,26 +270,59 @@ class DepreciationSerializer(serializers.ModelSerializer):
         model = Depreciation
         fields = '__all__'
 
-# BillIte# BillItem Serializerm Serializer
+# BillItem Serializer
 
 
 class BillItemSerializer(serializers.ModelSerializer):
-    item = serializers.StringRelatedField()
+    # accept item ID for posting
+    item = serializers.PrimaryKeyRelatedField(
+        queryset=Item.objects.all(), required=False, allow_null=True
+    )
 
     class Meta:
         model = BillItem
-        fields = '__all__'
+        exclude = ("bill",)
 
 # Bill Serializer
 
 
 class BillSerializer(serializers.ModelSerializer):
-    items = BillItemSerializer(
-        source='billitem_set', many=True, read_only=True)
+    items = BillItemSerializer(many=True, write_only=True)   # for input
+    bill_items = BillItemSerializer(
+        source='billitem_set', many=True, read_only=True)    # for output
 
     class Meta:
         model = Bill
-        fields = '__all__'
+        fields = (
+            'id', 'vendor', 'bill_date', 'name', 'reference', 'memo',
+            'due_date', 'attachment', 'debit_account', 'credit_account',
+            'amount', 'status', 'bill_type', 'created_at', 'updated_at',
+            'items', 'bill_items'
+        )
+
+    def create(self, validated_data):
+        items_data = validated_data.pop('items', [])
+        bill = Bill.objects.create(**validated_data)
+
+        for item_data in items_data:
+            BillItem.objects.create(bill=bill, **item_data)
+
+        return bill
+
+    def update(self, instance, validated_data):
+        items_data = validated_data.pop('items', [])
+        # update bill fields
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+
+        # replace bill items
+        if items_data:
+            instance.billitem_set.all().delete()
+            for item_data in items_data:
+                BillItem.objects.create(bill=instance, **item_data)
+
+        return instance
 
 # Check Serializer
 

@@ -13,7 +13,6 @@ class AccountName(models.Model):
 
 
 class Account(models.Model):
-    # Define choices for account_type and detail_type
     ACCOUNT_TYPE_CHOICES = [
         ('debit', 'Debit'),
         ('credit', 'Credit'),
@@ -110,12 +109,12 @@ class BankTransaction(models.Model):
     account = models.ForeignKey(
         Account, on_delete=models.CASCADE, related_name='transactions')
     date = models.DateField(default=timezone.now)
-    payee = models.CharField(max_length=255, null=True, blank=True)
+    payee = models.ForeignKey(
+        Party, on_delete=models.CASCADE, null=True, blank=True)
     description = models.TextField(null=True, blank=True)
     withdrawal = models.DecimalField(
         max_digits=10, decimal_places=2, default=0)
     deposit = models.DecimalField(max_digits=10, decimal_places=2, default=0)
-    # Could be FK to a Rule model if needed
     banking_rule = models.CharField(max_length=255, null=True, blank=True)
     cleared = models.BooleanField(default=False)
     status = models.CharField(max_length=50, default='pending')
@@ -149,7 +148,7 @@ class SalesInvoice(models.Model):
     status = models.CharField(max_length=50, default='open')
     mapping_status = models.CharField(max_length=50, null=True, blank=True)
     items = models.ManyToManyField(
-        Item, through='InvoiceItem')  # For line items
+        Item, through='InvoiceItem')
     debit_account = models.ForeignKey(
         Account, on_delete=models.SET_NULL, null=True, blank=True, related_name='debit_invoices')
     credit_account = models.ForeignKey(
@@ -463,6 +462,10 @@ class Depreciation(models.Model):
 
 
 class Bill(models.Model):
+    BILL_TYPE_CHOICES = [
+        ('withdrawal', 'Withdrawal'),
+        ('deposit', 'Deposit'),
+    ]
     vendor = models.ForeignKey(
         Party, on_delete=models.CASCADE, limit_choices_to={'type': 'vendor'})
     bill_date = models.DateField(default=timezone.now)
@@ -479,13 +482,14 @@ class Bill(models.Model):
     status = models.CharField(max_length=50, default='open')
     items = models.ManyToManyField(
         Item, through='BillItem')
+    bill_type = models.CharField(
+        max_length=50, choices=BILL_TYPE_CHOICES, default='withdrawal')
     created_at = models.DateTimeField(default=timezone.now)
     updated_at = models.DateTimeField(default=timezone.now)
 
 
 class BillItem(models.Model):
     bill = models.ForeignKey(Bill, on_delete=models.CASCADE)
-    # Or description for expenses
     item = models.ForeignKey(
         Item, on_delete=models.CASCADE, null=True, blank=True)
     description = models.TextField(null=True, blank=True)
@@ -497,6 +501,10 @@ class BillItem(models.Model):
 
 
 class Check(models.Model):
+    CHECK_TYPE_CHOICES = [
+        ('withdrawal', 'Withdrawal'),
+        ('deposit', 'Deposit'),
+    ]
     bank_account = models.ForeignKey(
         Account, on_delete=models.CASCADE, limit_choices_to={'bank_name__isnull': False})
     check_number = models.CharField(max_length=50)
@@ -509,11 +517,19 @@ class Check(models.Model):
     date = models.DateField(default=timezone.now)
     vendor = models.ForeignKey(Party, on_delete=models.SET_NULL,
                                null=True, blank=True, limit_choices_to={'type': 'vendor'})
+    check_type = models.CharField(
+        max_length=50, choices=CHECK_TYPE_CHOICES, default='withdrawal')
     status = models.CharField(max_length=50, default='issued')
     created_at = models.DateTimeField(default=timezone.now)
     updated_at = models.DateTimeField(default=timezone.now)
 
-# Journal Entry (General ledger entries, connecting to accounts)
+# Registers
+
+
+class Registers(models.Model):
+    account_name = models.ForeignKey(
+        Account, on_delete=models.CASCADE, related_name='registers')
+    # Journal Entry (General ledger entries, connecting to accounts)
 
 
 class JournalEntry(models.Model):
