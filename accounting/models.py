@@ -45,7 +45,6 @@ class Account(models.Model):
     bank_address = models.CharField(max_length=255, null=True, blank=True)
     status = models.CharField(
         max_length=50, choices=STATUS_CHOICES, null=True, blank=True)
-    # Add created_at and updated_at fields
     created_at = models.DateTimeField(default=timezone.now)
     updated_at = models.DateTimeField(default=timezone.now)
 
@@ -89,9 +88,9 @@ class Item(models.Model):  # For products/services in sales, purchases, inventor
         max_digits=10, decimal_places=2, null=True, blank=True)
     price = models.DecimalField(
         max_digits=10, decimal_places=2, null=True, blank=True)
-    quantity = models.IntegerField(default=0)  # For inventory tracking
+    quantity = models.IntegerField(default=0)
     unit = models.CharField(max_length=50, null=True,
-                            blank=True)  # e.g., pcs, kg
+                            blank=True)
     category = models.CharField(max_length=255, null=True, blank=True)
     manufacturer = models.CharField(max_length=255, null=True, blank=True)
     location = models.CharField(max_length=255, null=True, blank=True)
@@ -130,11 +129,10 @@ class BankTransaction(models.Model):
 class SalesPayment(models.Model):
     date = models.DateField(default=timezone.now)
     amount = models.DecimalField(max_digits=10, decimal_places=2)
-    payment_mode = models.CharField(max_length=50)  # e.g., cash, card
+    payment_mode = models.CharField(max_length=50)
     invoice = models.ForeignKey(
         'SalesInvoice', on_delete=models.SET_NULL, null=True, blank=True, related_name='payments')
     status = models.CharField(max_length=50, default='paid')
-    # Placeholder for integration/mapping
     mapping_status = models.CharField(max_length=50, null=True, blank=True)
     created_at = models.DateTimeField(default=timezone.now)
     updated_at = models.DateTimeField(default=timezone.now)
@@ -194,7 +192,7 @@ class SalesRefund(models.Model):
 
 
 class Expense(models.Model):
-    name = models.CharField(max_length=255)  # e.g., expense description
+    name = models.CharField(max_length=255)
     date = models.DateField(default=timezone.now)
     amount = models.DecimalField(max_digits=10, decimal_places=2)
     category = models.CharField(max_length=255)
@@ -203,7 +201,7 @@ class Expense(models.Model):
     status = models.CharField(max_length=50)
     mapping_status = models.CharField(max_length=50, null=True, blank=True)
     account = models.ForeignKey(
-        Account, on_delete=models.SET_NULL, null=True, blank=True)  # Debit/credit link
+        Account, on_delete=models.SET_NULL, null=True, blank=True)
     created_at = models.DateTimeField(default=timezone.now)
     updated_at = models.DateTimeField(default=timezone.now)
 
@@ -213,7 +211,7 @@ class Expense(models.Model):
 class Payslip(models.Model):
     name = models.CharField(max_length=255)
     template = models.CharField(max_length=255, null=True, blank=True)
-    month = models.CharField(max_length=50)  # e.g., 'August 2025'
+    month = models.CharField(max_length=50)
     staff = models.ForeignKey(
         Party, on_delete=models.CASCADE, limit_choices_to={'type': 'staff'})
     created_date = models.DateField(default=timezone.now)
@@ -336,11 +334,11 @@ class StockExport(models.Model):
 
 
 class LossAdjustment(models.Model):
-    type = models.CharField(max_length=50)  # lost or adjusted
+    type = models.CharField(max_length=50)
     time = models.DateTimeField(default=timezone.now)
     status = models.CharField(max_length=50)
     mapping_status = models.CharField(max_length=50, null=True, blank=True)
-    items = models.ManyToManyField(Item)  # With quantities if needed
+    items = models.ManyToManyField(Item)
     created_at = models.DateTimeField(default=timezone.now)
     updated_at = models.DateTimeField(default=timezone.now)
 
@@ -363,7 +361,7 @@ class ManufacturingOrder(models.Model):
     product = models.ForeignKey(
         Item, on_delete=models.CASCADE, related_name='manufactured_product')
     bill_of_material = models.TextField(
-        null=True, blank=True)  # Or M2M to components
+        null=True, blank=True)
     quantity = models.IntegerField()
     unit = models.CharField(max_length=50)
     routing = models.CharField(max_length=255, null=True, blank=True)
@@ -396,7 +394,7 @@ class License(models.Model):
     licensed_to_email = models.EmailField()
     licensed_to_name = models.CharField(max_length=255)
     manufacturer = models.CharField(max_length=255)
-    total = models.IntegerField()  # e.g., number of licenses
+    total = models.IntegerField()
     purchase_date = models.DateField(null=True, blank=True)
     purchase_cost = models.DecimalField(max_digits=10, decimal_places=2)
     mapping_status = models.CharField(max_length=50, null=True, blank=True)
@@ -429,7 +427,7 @@ class Consumable(models.Model):
     location = models.CharField(max_length=255)
     total = models.IntegerField()
     min_quantity = models.IntegerField()
-    avail = models.IntegerField()  # Available
+    avail = models.IntegerField()
     purchase_cost = models.DecimalField(max_digits=10, decimal_places=2)
     mapping_status = models.CharField(max_length=50, null=True, blank=True)
     created_at = models.DateTimeField(default=timezone.now)
@@ -523,13 +521,7 @@ class Check(models.Model):
     created_at = models.DateTimeField(default=timezone.now)
     updated_at = models.DateTimeField(default=timezone.now)
 
-# Registers
-
-
-class Registers(models.Model):
-    account_name = models.ForeignKey(
-        Account, on_delete=models.CASCADE, related_name='registers')
-    # Journal Entry (General ledger entries, connecting to accounts)
+ # Journal Entry (General ledger entries, connecting to accounts)
 
 
 class JournalEntry(models.Model):

@@ -290,6 +290,9 @@ class BillSerializer(serializers.ModelSerializer):
     items = BillItemSerializer(many=True, write_only=True)   # for input
     bill_items = BillItemSerializer(
         source='billitem_set', many=True, read_only=True)    # for output
+    debit_account = AccountSerializer(read_only=True)
+    credit_account = AccountSerializer(read_only=True)
+    vendor = PartySerializer(read_only=True)
 
     class Meta:
         model = Bill
@@ -328,6 +331,10 @@ class BillSerializer(serializers.ModelSerializer):
 
 
 class CheckSerializer(serializers.ModelSerializer):
+    pay_to = AccountSerializer(read_only=True)
+    bank_account = AccountSerializer(read_only=True)
+    vendor = PartySerializer(read_only=True)
+
     class Meta:
         model = Check
         fields = '__all__'
