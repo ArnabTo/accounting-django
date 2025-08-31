@@ -47,6 +47,7 @@ class AccountSerializer(serializers.ModelSerializer):
 
 # BankTransaction Serializer
 class BankTransactionSerializer(serializers.ModelSerializer):
+    account = serializers.PrimaryKeyRelatedField(queryset=Account.objects.all(), required=False, allow_null=True)
     class Meta:
         model = BankTransaction
         fields = '__all__'
@@ -67,27 +68,39 @@ class ItemSerializer(serializers.ModelSerializer):
         model = Item
         fields = '__all__'
 
+
+# InvoiceItem Serializer (for nested items in invoices and bills)
+class InvoiceItemSerializer(serializers.ModelSerializer):
+    item = ItemSerializer()
+    class Meta:
+        model = InvoiceItem
+        fields = '__all__'
+
+
+# SalesInvoice Serializer (with nested items for display)
+class SalesInvoiceSerializer(serializers.ModelSerializer):
+    items = serializers.PrimaryKeyRelatedField(many=True, queryset=InvoiceItem.objects.all(), required=False, allow_null=True)
+
+    class Meta:
+        model = SalesInvoice
+        fields = '__all__'
+
 # SalesPayment Serializer
-
-
 class SalesPaymentSerializer(serializers.ModelSerializer):
+    invoice = serializers.PrimaryKeyRelatedField(queryset=SalesInvoice.objects.all(), required=False, allow_null=True)
+
     class Meta:
         model = SalesPayment
         fields = '__all__'
 
-# InvoiceItem Serializer (for nested items in invoices and bills)
 
 
-class InvoiceItemSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = InvoiceItem
-        fields = '__all__'
 
 # SalesInvoice Serializer (with nested items for display)
 
 
 class SalesInvoiceSerializer(serializers.ModelSerializer):
-    items = InvoiceItemSerializer(many=True, read_only=True)
+    items = serializers.PrimaryKeyRelatedField(many=True, queryset=InvoiceItem.objects.all(), required=False, allow_null=True)
 
     class Meta:
         model = SalesInvoice
@@ -97,6 +110,7 @@ class SalesInvoiceSerializer(serializers.ModelSerializer):
 
 
 class SalesOrderReturnSerializer(serializers.ModelSerializer):
+    customer = serializers.PrimaryKeyRelatedField(queryset=Party.objects.all(), required=False, allow_null=True)
     class Meta:
         model = SalesOrderReturn
         fields = '__all__'
@@ -113,6 +127,7 @@ class SalesRefundSerializer(serializers.ModelSerializer):
 
 
 class ExpenseSerializer(serializers.ModelSerializer):
+    account = serializers.PrimaryKeyRelatedField(queryset=Account.objects.all(), required=False, allow_null=True)
     class Meta:
         model = Expense
         fields = '__all__'
@@ -121,32 +136,41 @@ class ExpenseSerializer(serializers.ModelSerializer):
 
 
 class PayslipSerializer(serializers.ModelSerializer):
+    staff = serializers.PrimaryKeyRelatedField(queryset=Party.objects.all(), required=False, allow_null=True)
     class Meta:
         model = Payslip
-        fields = '__all__'
-
-# PurchaseOrderItem Serializer
-
-
-class PurchaseOrderItemSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = PurchaseOrderItem
         fields = '__all__'
 
 # PurchaseOrder Serializer
 
 
 class PurchaseOrderSerializer(serializers.ModelSerializer):
-    items = PurchaseOrderItemSerializer(many=True, read_only=True)
+    items = serializers.PrimaryKeyRelatedField(many=True, queryset=PurchaseOrderItem.objects.all(), required=False, allow_null=True)
 
     class Meta:
         model = PurchaseOrder
         fields = '__all__'
 
+# PurchaseOrderItem Serializer
+
+
+class PurchaseOrderItemSerializer(serializers.ModelSerializer):
+    purchase_order = serializers.PrimaryKeyRelatedField(queryset=PurchaseOrder.objects.all(), required=False, allow_null=True)
+    item = ItemSerializer()
+
+    class Meta:
+        model = PurchaseOrderItem
+        fields = '__all__'
+
+
+
 # PurchaseInvoice Serializer
 
 
 class PurchaseInvoiceSerializer(serializers.ModelSerializer):
+    vendor = serializers.PrimaryKeyRelatedField(queryset=Party.objects.all(), required=False, allow_null=True)
+    purchase_order = serializers.PrimaryKeyRelatedField(queryset=PurchaseOrder.objects.all(), required=True, allow_null=True)
+
     class Meta:
         model = PurchaseInvoice
         fields = '__all__'
@@ -155,6 +179,7 @@ class PurchaseInvoiceSerializer(serializers.ModelSerializer):
 
 
 class PurchasePaymentSerializer(serializers.ModelSerializer):
+    purchase_order = serializers.PrimaryKeyRelatedField(queryset=PurchaseOrder.objects.all(), required=False, allow_null=True)
     class Meta:
         model = PurchasePayment
         fields = '__all__'
@@ -163,6 +188,7 @@ class PurchasePaymentSerializer(serializers.ModelSerializer):
 
 
 class PurchaseOrderReturnSerializer(serializers.ModelSerializer):
+    vendor = serializers.PrimaryKeyRelatedField(queryset=Party.objects.all(), required=False, allow_null=True)
     class Meta:
         model = PurchaseOrderReturn
         fields = '__all__'
@@ -171,6 +197,7 @@ class PurchaseOrderReturnSerializer(serializers.ModelSerializer):
 
 
 class PurchaseRefundSerializer(serializers.ModelSerializer):
+    purchase_order_return = serializers.PrimaryKeyRelatedField(queryset=PurchaseOrderReturn.objects.all(), required=False, allow_null=True)
     class Meta:
         model = PurchaseRefund
         fields = '__all__'
@@ -179,6 +206,8 @@ class PurchaseRefundSerializer(serializers.ModelSerializer):
 
 
 class InventoryReceivingVoucherSerializer(serializers.ModelSerializer):
+    items = serializers.PrimaryKeyRelatedField(many=True, queryset=Item.objects.all(), required=False, allow_null=True)
+
     class Meta:
         model = InventoryReceivingVoucher
         fields = '__all__'
@@ -187,6 +216,9 @@ class InventoryReceivingVoucherSerializer(serializers.ModelSerializer):
 
 
 class StockExportSerializer(serializers.ModelSerializer):
+    customer = serializers.PrimaryKeyRelatedField(queryset=Party.objects.all(), required=False, allow_null=True)
+    invoices = serializers.PrimaryKeyRelatedField(many=True, queryset=SalesInvoice.objects.all(), required=False, allow_null=True)
+
     class Meta:
         model = StockExport
         fields = '__all__'
@@ -195,6 +227,8 @@ class StockExportSerializer(serializers.ModelSerializer):
 
 
 class LossAdjustmentSerializer(serializers.ModelSerializer):
+    items = serializers.PrimaryKeyRelatedField(many=True, queryset=Item.objects.all(), required=False, allow_null=True)
+
     class Meta:
         model = LossAdjustment
         fields = '__all__'
@@ -203,6 +237,8 @@ class LossAdjustmentSerializer(serializers.ModelSerializer):
 
 
 class OpeningStockSerializer(serializers.ModelSerializer):
+    item = serializers.PrimaryKeyRelatedField(queryset=Item.objects.all(), required=False, allow_null=True)
+
     class Meta:
         model = OpeningStock
         fields = '__all__'
@@ -211,6 +247,7 @@ class OpeningStockSerializer(serializers.ModelSerializer):
 
 
 class ManufacturingOrderSerializer(serializers.ModelSerializer):
+    product = serializers.PrimaryKeyRelatedField(queryset=Item.objects.all(), required=False, allow_null=True)
     class Meta:
         model = ManufacturingOrder
         fields = '__all__'
@@ -251,6 +288,8 @@ class ConsumableSerializer(serializers.ModelSerializer):
 
 
 class MaintenanceSerializer(serializers.ModelSerializer):
+    asset = serializers.PrimaryKeyRelatedField(queryset=Asset.objects.all(), required=False, allow_null=True)
+
     class Meta:
         model = Maintenance
         fields = '__all__'
@@ -259,35 +298,45 @@ class MaintenanceSerializer(serializers.ModelSerializer):
 
 
 class DepreciationSerializer(serializers.ModelSerializer):
+    asset = serializers.PrimaryKeyRelatedField(queryset=Asset.objects.all(), required=False, allow_null=True)
+
     class Meta:
         model = Depreciation
+        fields = '__all__'
+
+
+# Bill Serializer
+
+
+class BillSerializer(serializers.ModelSerializer):
+    vendor = serializers.PrimaryKeyRelatedField(queryset=Party.objects.all(), required=False, allow_null=True)
+    debit_account = serializers.PrimaryKeyRelatedField(queryset=Account.objects.all(), required=False, allow_null=True)
+    credit_account = serializers.PrimaryKeyRelatedField(queryset=Account.objects.all(), required=False, allow_null=True)
+    items = serializers.PrimaryKeyRelatedField(many=True, queryset=Item.objects.all(), required=False, allow_null=True)
+
+    class Meta:
+        model = Bill
         fields = '__all__'
 
 # BillIte# BillItem Serializerm Serializer
 
 
 class BillItemSerializer(serializers.ModelSerializer):
-    item = serializers.StringRelatedField()
+    bill = serializers.PrimaryKeyRelatedField(queryset=Bill.objects.all(), required=False, allow_null=True)
+    item = serializers.PrimaryKeyRelatedField(queryset=Item.objects.all(), required=False, allow_null=True)
 
     class Meta:
         model = BillItem
-        fields = '__all__'
-
-# Bill Serializer
-
-
-class BillSerializer(serializers.ModelSerializer):
-    items = BillItemSerializer(
-        source='billitem_set', many=True, read_only=True)
-
-    class Meta:
-        model = Bill
         fields = '__all__'
 
 # Check Serializer
 
 
 class CheckSerializer(serializers.ModelSerializer):
+    bank_account = serializers.PrimaryKeyRelatedField(queryset=Account.objects.all(), required=False, allow_null=True)
+    pay_to = serializers.PrimaryKeyRelatedField(queryset=Account.objects.all(), required=False, allow_null=True)
+    vendor = serializers.PrimaryKeyRelatedField(queryset=Party.objects.all(), required=False, allow_null=True)
+
     class Meta:
         model = Check
         fields = '__all__'
@@ -296,6 +345,8 @@ class CheckSerializer(serializers.ModelSerializer):
 
 
 class JournalEntryLineSerializer(serializers.ModelSerializer):
+    journal_entry = serializers.PrimaryKeyRelatedField(queryset=JournalEntry.objects.all(), required=False, allow_null=True)
+
     class Meta:
         model = JournalEntryLine
         fields = '__all__'
@@ -308,4 +359,9 @@ class JournalEntrySerializer(serializers.ModelSerializer):
 
     class Meta:
         model = JournalEntry
+        fields = '__all__'
+
+class SalesRefundSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = SalesRefund
         fields = '__all__'
