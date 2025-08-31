@@ -263,7 +263,7 @@ class DepreciationSerializer(serializers.ModelSerializer):
         model = Depreciation
         fields = '__all__'
 
-# BillItem Serializer
+# BillIte# BillItem Serializerm Serializer
 
 
 class BillItemSerializer(serializers.ModelSerializer):
