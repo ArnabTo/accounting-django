@@ -281,7 +281,6 @@ class BillItemSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = BillItem
-        exclude = ("bill",)
 
 # Bill Serializer
 
