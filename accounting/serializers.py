@@ -4,12 +4,12 @@ from .models import (
     AccountName, Account,
     BankTransaction, Party,
     Item, SalesPayment,
-    SalesInvoice, InvoiceItem,
+    SalesInvoice,
     SalesOrderReturn, SalesRefund, Expense, Payslip, PurchaseOrder, PurchaseOrderItem,
     PurchaseInvoice, PurchasePayment, PurchaseOrderReturn, PurchaseRefund,
     InventoryReceivingVoucher, StockExport, LossAdjustment, OpeningStock,
     ManufacturingOrder, Asset, License, Component, Consumable, Maintenance,
-    Depreciation, Bill, BillItem, Check, JournalEntry, JournalEntryLine, Convert
+    Depreciation, Bill, BillItem, Check, JournalEntry, JournalEntryLine, Convert, Order, OrderItem
 )
 from django.utils import timezone
 
@@ -81,41 +81,99 @@ class SalesPaymentSerializer(serializers.ModelSerializer):
         model = SalesPayment
         fields = '__all__'
 
-# InvoiceItem Serializer (for nested items in invoices and bills)
 
+class OrderItemReadSerializer(serializers.ModelSerializer):
+    item = ItemSerializer(read_only=True)
 
-class InvoiceItemSerializer(serializers.ModelSerializer):
     class Meta:
-        model = InvoiceItem
+        model = OrderItem
+        fields = ['id', 'item', 'quantity', 'unit_price', 'subtotal']
+
+
+class OrderReadSerializer(serializers.ModelSerializer):
+    customer = PartySerializer(read_only=True)
+    items = OrderItemReadSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = Order
+        fields = ['id', 'order_number', 'seller', 'order_date',
+                  'payment_mode', 'customer', 'total_amount', 'items']
+
+
+class OrderItemWriteSerializer(serializers.ModelSerializer):
+    item_id = serializers.PrimaryKeyRelatedField(
+        queryset=Item.objects.all(), source='item')
+
+    class Meta:
+        model = OrderItem
+        fields = ['item_id', 'quantity', 'unit_price']
+
+
+class OrderWriteSerializer(serializers.ModelSerializer):
+    items = OrderItemWriteSerializer(many=True, write_only=True)
+
+    class Meta:
+        model = Order
         fields = '__all__'
+
+    def create(self, validated_data):
+        items_data = validated_data.pop('items')
+        order = Order.objects.create(**validated_data)
+        for item_data in items_data:
+            OrderItem.objects.create(order=order, **item_data)
+        # Optional: calculate total
+        order.calculate_total()
+        return order
+
+    def update(self, instance, validated_data):
+        items_data = validated_data.pop('items', None)
+        instance.seller = validated_data.get('seller', instance.seller)
+        instance.payment_mode = validated_data.get(
+            'payment_mode', instance.payment_mode)
+        instance.customer = validated_data.get('customer', instance.customer)
+        instance.save()
+
+        if items_data is not None:
+            # Remove existing items and add new
+            instance.items.all().delete()
+            for item_data in items_data:
+                OrderItem.objects.create(order=instance, **item_data)
+
+        instance.calculate_total()
+        return instance
 
 # SalesInvoice Serializer (with nested items for display)
 
 
-class SalesInvoiceSerializer(serializers.ModelSerializer):
-    items = ItemSerializer(many=True, read_only=True)
-    customer = PartySerializer(read_only=True)
-    debit_account = AccountSerializer(read_only=True)
-    credit_account = AccountSerializer(read_only=True)
+class SalesInvoiceRead(serializers.ModelSerializer):
+    order = OrderReadSerializer(read_only=True)
 
     class Meta:
         model = SalesInvoice
         fields = '__all__'
 
 
-class SalesInvoiceCreateUpdateSerializer(serializers.ModelSerializer):
+class SalesInvoiceWrite(serializers.ModelSerializer):
     class Meta:
         model = SalesInvoice
         fields = '__all__'
+
 
 # SalesOrderReturn Serializer
 
 
-class SalesOrderReturnSerializer(serializers.ModelSerializer):
+class SalesOrderReturnCreateUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = SalesOrderReturn
         fields = '__all__'
 
+
+class SalesOrderReturnSerializer(serializers.ModelSerializer):
+    order = OrderReadSerializer(read_only=True)
+
+    class Meta:
+        model = SalesOrderReturn
+        fields = '__all__'
 # SalesRefund Serializer
 
 
@@ -127,7 +185,15 @@ class SalesRefundSerializer(serializers.ModelSerializer):
 # Expense Serializer
 
 
-class ExpenseSerializer(serializers.ModelSerializer):
+class ExpenseReadSerializer(serializers.ModelSerializer):
+    account = AccountSerializer(read_only=True)
+
+    class Meta:
+        model = Expense
+        fields = '__all__'
+
+
+class ExpenseWriteSerializer(serializers.ModelSerializer):
     class Meta:
         model = Expense
         fields = '__all__'

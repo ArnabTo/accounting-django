@@ -3,7 +3,7 @@ from rest_framework.routers import DefaultRouter
 from .views import (
     AccountNameViewSet, AccountViewSet,
     BankTransactionViewSet, PartyViewSet,
-    ItemViewSet, SalesPaymentViewSet,
+    ItemViewSet, SalesPaymentViewSet, OrderViewSet,
     SalesInvoiceViewSet, SalesOrderReturnViewSet,
     SalesRefundViewSet, ExpenseViewSet,
     PayslipViewSet, PurchaseOrderViewSet,
@@ -25,6 +25,7 @@ router.register(r'parties', PartyViewSet)
 router.register(r'items', ItemViewSet)
 router.register(r'sales-payments', SalesPaymentViewSet)
 router.register(r'sales-invoices', SalesInvoiceViewSet)
+router.register(r'orders', OrderViewSet)
 router.register(r'sales-order-returns', SalesOrderReturnViewSet)
 router.register(r'sales-refunds', SalesRefundViewSet)
 router.register(r'expenses', ExpenseViewSet)

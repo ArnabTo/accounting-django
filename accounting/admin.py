@@ -1,11 +1,11 @@
 from .models import (AccountName, Account, Party, Item, BankTransaction,
-                     SalesPayment, SalesInvoice, InvoiceItem, SalesOrderReturn,
+                     SalesPayment, SalesInvoice, SalesOrderReturn,
                      SalesRefund, Expense, Payslip, PurchaseOrder, PurchaseOrderItem,
                      PurchaseInvoice, PurchasePayment, PurchaseOrderReturn,
                      PurchaseRefund, InventoryReceivingVoucher, StockExport,
                      LossAdjustment, OpeningStock, ManufacturingOrder, Asset,
                      License, Component, Consumable, Maintenance, Depreciation,
-                     Bill, BillItem, Check, JournalEntry, JournalEntryLine)
+                     Bill, BillItem, Check, JournalEntry, JournalEntryLine, Order, OrderItem)
 from django.contrib import admin
 from django.contrib import admin
 from .models import AccountName, Account
@@ -44,6 +44,18 @@ class ItemAdmin(admin.ModelAdmin):
     list_display = ('name', 'type', 'sku', 'price', 'quantity', 'category')
     list_filter = ('type', 'category')
     search_fields = ('name', 'sku')
+
+
+@admin.register(Order)
+class OrderAdmin(admin.ModelAdmin):
+    list_display = ('order_number', 'seller',
+                    'customer', 'total_amount')
+
+
+@admin.register(OrderItem)
+class OrderItemAdmin(admin.ModelAdmin):
+    list_display = ('id', 'order', 'item', 'quantity',
+                    'unit_price', 'subtotal')
 
 
 @admin.register(BankTransaction)
@@ -100,7 +112,6 @@ class JournalEntryAdmin(admin.ModelAdmin):
 
 # Register remaining models with basic ModelAdmin
 admin.site.register(SalesPayment)
-admin.site.register(InvoiceItem)
 admin.site.register(SalesOrderReturn)
 admin.site.register(SalesRefund)
 admin.site.register(Expense)

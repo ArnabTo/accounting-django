@@ -5,8 +5,9 @@ from django.utils import timezone
 
 
 class AccountName(models.Model):
-    name = models.CharField(max_length=255)
-    balance = models.DecimalField(max_digits=10, decimal_places=2)
+    name = models.CharField(max_length=255, null=True, blank=True)
+    balance = models.DecimalField(
+        max_digits=10, decimal_places=2, blank=True, null=True)
 
     def __str__(self):
         return self.name
@@ -45,8 +46,10 @@ class Account(models.Model):
     bank_address = models.CharField(max_length=255, null=True, blank=True)
     status = models.CharField(
         max_length=50, choices=STATUS_CHOICES, null=True, blank=True)
-    created_at = models.DateTimeField(default=timezone.now)
-    updated_at = models.DateTimeField(default=timezone.now)
+    created_at = models.DateTimeField(
+        default=timezone.now, null=True, blank=True)
+    updated_at = models.DateTimeField(
+        default=timezone.now, null=True, blank=True)
 
     def __str__(self):
         return self.name
@@ -67,8 +70,10 @@ class Party(models.Model):  # For Customers, Vendors, Staff, etc.
     address = models.TextField(null=True, blank=True)
     phone = models.CharField(max_length=50, null=True, blank=True)
     status = models.CharField(max_length=50, default='active')
-    created_at = models.DateTimeField(default=timezone.now)
-    updated_at = models.DateTimeField(default=timezone.now)
+    created_at = models.DateTimeField(
+        default=timezone.now, null=True, blank=True)
+    updated_at = models.DateTimeField(
+        default=timezone.now, null=True, blank=True)
 
     def __str__(self):
         return f"{self.name} ({self.type})"
@@ -95,8 +100,10 @@ class Item(models.Model):  # For products/services in sales, purchases, inventor
     manufacturer = models.CharField(max_length=255, null=True, blank=True)
     location = models.CharField(max_length=255, null=True, blank=True)
     min_quantity = models.IntegerField(default=0)
-    created_at = models.DateTimeField(default=timezone.now)
-    updated_at = models.DateTimeField(default=timezone.now)
+    created_at = models.DateTimeField(
+        default=timezone.now, null=True, blank=True)
+    updated_at = models.DateTimeField(
+        default=timezone.now, null=True, blank=True)
 
     def __str__(self):
         return self.name
@@ -107,7 +114,7 @@ class Item(models.Model):  # For products/services in sales, purchases, inventor
 class BankTransaction(models.Model):
     account = models.ForeignKey(
         Account, on_delete=models.CASCADE, related_name='transactions')
-    date = models.DateField(default=timezone.now)
+    date = models.DateTimeField(default=timezone.now)
     payee = models.ForeignKey(
         Party, on_delete=models.CASCADE, null=True, blank=True)
     description = models.TextField(null=True, blank=True)
@@ -117,82 +124,125 @@ class BankTransaction(models.Model):
     banking_rule = models.CharField(max_length=255, null=True, blank=True)
     cleared = models.BooleanField(default=False)
     status = models.CharField(max_length=50, default='pending')
-    created_at = models.DateTimeField(default=timezone.now)
-    updated_at = models.DateTimeField(default=timezone.now)
+    created_at = models.DateTimeField(
+        default=timezone.now, null=True, blank=True)
+    updated_at = models.DateTimeField(
+        default=timezone.now, null=True, blank=True)
 
     def __str__(self):
         return f"Transaction {self.date} for {self.account}"
 
 # Transactions: Sales
 
+# Orders
+
+
+class Order(models.Model):
+    PAYMENT_MODE = [
+        ('cash', 'Cash'),
+        ('bank', 'Bank'),
+    ]
+
+    order_number = models.CharField(
+        max_length=100, unique=True, null=True, blank=True)
+    seller = models.CharField(max_length=255, null=True, blank=True)
+    order_date = models.DateTimeField(default=timezone.now)
+    payment_mode = models.CharField(
+        max_length=50, choices=PAYMENT_MODE, default='cash')
+    customer = models.ForeignKey(
+        Party, on_delete=models.CASCADE, null=True, blank=True)
+    total_amount = models.DecimalField(
+        max_digits=12, decimal_places=2, default=0)
+
+    def __str__(self):
+        return f"Order {self.order_number} ({self.customer})"
+
+    # Calculate total automatically
+    def calculate_total(self):
+        total = sum(item.subtotal() for item in self.items.all())
+        self.total_amount = total
+        self.save()
+        return total
+
+
+class OrderItem(models.Model):
+    order = models.ForeignKey(
+        Order, on_delete=models.CASCADE, related_name='items', null=True, blank=True)
+    item = models.ForeignKey(
+        Item, on_delete=models.CASCADE, null=True, blank=True)
+    quantity = models.PositiveIntegerField(default=1, null=True, blank=True)
+    unit_price = models.DecimalField(
+        max_digits=10, decimal_places=2, null=True, blank=True)
+
+    def subtotal(self):
+        return self.quantity * self.unit_price
+
+    def __str__(self):
+        return f"{self.item.name} x {self.quantity}"
+
+
+class SalesInvoice(models.Model):
+    order = models.ForeignKey(
+        Order, on_delete=models.CASCADE, related_name='invoices', null=True, blank=True)
+    date = models.DateTimeField(default=timezone.now)
+    amount = models.DecimalField(max_digits=10, decimal_places=2)
+    customer = models.ForeignKey(Party, on_delete=models.CASCADE)
+    status = models.CharField(max_length=50, default='open')
+    debit_account = models.ForeignKey(
+        Account, on_delete=models.SET_NULL, null=True, blank=True, related_name='debit_invoices')
+    credit_account = models.ForeignKey(
+        Account, on_delete=models.SET_NULL, null=True, blank=True, related_name='credit_invoices')
+    created_at = models.DateTimeField(
+        default=timezone.now, null=True, blank=True)
+    updated_at = models.DateTimeField(
+        default=timezone.now, null=True, blank=True)
+
 
 class SalesPayment(models.Model):
-    date = models.DateField(default=timezone.now)
+    date = models.DateTimeField(default=timezone.now)
     amount = models.DecimalField(max_digits=10, decimal_places=2)
     payment_mode = models.CharField(max_length=50)
     invoice = models.ForeignKey(
         'SalesInvoice', on_delete=models.SET_NULL, null=True, blank=True, related_name='payments')
     status = models.CharField(max_length=50, default='paid')
     mapping_status = models.CharField(max_length=50, null=True, blank=True)
-    created_at = models.DateTimeField(default=timezone.now)
-    updated_at = models.DateTimeField(default=timezone.now)
-
-# Intermediate for line items in invoices/bills/etc.
-
-
-class InvoiceItem(models.Model):
-    item = models.ForeignKey(Item, on_delete=models.CASCADE)
-    description = models.TextField(null=True, blank=True)
-    quantity = models.IntegerField(default=1)
-    cost = models.DecimalField(max_digits=10, decimal_places=2)
-    amount = models.DecimalField(max_digits=10, decimal_places=2)
-
-
-class SalesInvoice(models.Model):
-    date = models.DateTimeField(default=timezone.now)
-    amount = models.DecimalField(max_digits=10, decimal_places=2)
-    customer = models.ForeignKey(
-        Party, on_delete=models.CASCADE)
-    status = models.CharField(max_length=50, default='open')
-    items = models.ManyToManyField(
-        InvoiceItem, related_name='invoiceitems', blank=True)
-    debit_account = models.ForeignKey(
-        Account, on_delete=models.SET_NULL, null=True, blank=True, related_name='debit_invoices')
-    credit_account = models.ForeignKey(
-        Account, on_delete=models.SET_NULL, null=True, blank=True, related_name='credit_invoices')
-    created_at = models.DateTimeField(default=timezone.now)
-    updated_at = models.DateTimeField(default=timezone.now)
+    created_at = models.DateTimeField(
+        default=timezone.now, null=True, blank=True)
+    updated_at = models.DateTimeField(
+        default=timezone.now, null=True, blank=True)
 
 
 class SalesOrderReturn(models.Model):
-    order_number = models.CharField(max_length=100)
-    date = models.DateField(default=timezone.now)
-    customer = models.ForeignKey(
-        Party, on_delete=models.CASCADE, limit_choices_to={'type': 'customer'})
-    payment_mode = models.CharField(max_length=50)
+    order = models.ForeignKey(
+        Order, on_delete=models.CASCADE, related_name='returns', null=True, blank=True)
+    date = models.DateTimeField(default=timezone.now)
     channel = models.CharField(max_length=50, null=True, blank=True)
     status = models.CharField(max_length=50)
     mapping_status = models.CharField(max_length=50, null=True, blank=True)
-    created_at = models.DateTimeField(default=timezone.now)
-    updated_at = models.DateTimeField(default=timezone.now)
+    created_at = models.DateTimeField(
+        default=timezone.now, null=True, blank=True)
+    updated_at = models.DateTimeField(
+        default=timezone.now, null=True, blank=True)
 
 
 class SalesRefund(models.Model):
-    date = models.DateField(default=timezone.now)
+    date = models.DateTimeField(default=timezone.now)
     amount = models.DecimalField(max_digits=10, decimal_places=2)
     payment_mode = models.CharField(max_length=50)
     order_number = models.CharField(max_length=100)
     status = models.CharField(max_length=50)
     mapping_status = models.CharField(max_length=50, null=True, blank=True)
-    created_at = models.DateTimeField(default=timezone.now)
-    updated_at = models.DateTimeField(default=timezone.now)
+    created_at = models.DateTimeField(
+        default=timezone.now, null=True, blank=True)
+    updated_at = models.DateTimeField(
+        default=timezone.now, null=True, blank=True)
 
 # Transactions: Expenses
 
 
 class Expense(models.Model):
     name = models.CharField(max_length=255)
-    date = models.DateField(default=timezone.now)
+    date = models.DateTimeField(default=timezone.now)
     amount = models.DecimalField(max_digits=10, decimal_places=2)
     category = models.CharField(max_length=255)
     payment_mode = models.CharField(max_length=50)
@@ -201,8 +251,10 @@ class Expense(models.Model):
     mapping_status = models.CharField(max_length=50, null=True, blank=True)
     account = models.ForeignKey(
         Account, on_delete=models.SET_NULL, null=True, blank=True)
-    created_at = models.DateTimeField(default=timezone.now)
-    updated_at = models.DateTimeField(default=timezone.now)
+    created_at = models.DateTimeField(
+        default=timezone.now, null=True, blank=True)
+    updated_at = models.DateTimeField(
+        default=timezone.now, null=True, blank=True)
 
 # Transactions: Payslips (Payroll)
 
@@ -213,17 +265,19 @@ class Payslip(models.Model):
     month = models.CharField(max_length=50)
     staff = models.ForeignKey(
         Party, on_delete=models.CASCADE, limit_choices_to={'type': 'staff'})
-    created_date = models.DateField(default=timezone.now)
+    created_date = models.DateTimeField(default=timezone.now)
     status = models.CharField(max_length=50)
     mapping_status = models.CharField(max_length=50, null=True, blank=True)
-    created_at = models.DateTimeField(default=timezone.now)
-    updated_at = models.DateTimeField(default=timezone.now)
+    created_at = models.DateTimeField(
+        default=timezone.now, null=True, blank=True)
+    updated_at = models.DateTimeField(
+        default=timezone.now, null=True, blank=True)
 
 # Transactions: Purchases (Similar to Sales but for vendors)
 
 
 class PurchaseOrder(models.Model):
-    order_date = models.DateField(default=timezone.now)
+    order_date = models.DateTimeField(default=timezone.now)
     vendor = models.ForeignKey(
         Party, on_delete=models.CASCADE, limit_choices_to={'type': 'vendor'})
     po_value = models.DecimalField(max_digits=10, decimal_places=2)
@@ -232,8 +286,10 @@ class PurchaseOrder(models.Model):
     payment_status = models.CharField(max_length=50)
     mapping_status = models.CharField(max_length=50, null=True, blank=True)
     items = models.ManyToManyField(Item, through='PurchaseOrderItem')
-    created_at = models.DateTimeField(default=timezone.now)
-    updated_at = models.DateTimeField(default=timezone.now)
+    created_at = models.DateTimeField(
+        default=timezone.now, null=True, blank=True)
+    updated_at = models.DateTimeField(
+        default=timezone.now, null=True, blank=True)
 
 
 class PurchaseOrderItem(models.Model):
@@ -252,28 +308,32 @@ class PurchaseInvoice(models.Model):
     contract = models.CharField(max_length=255, null=True, blank=True)
     purchase_order = models.ForeignKey(
         PurchaseOrder, on_delete=models.SET_NULL, null=True, blank=True)
-    invoice_date = models.DateField(default=timezone.now)
-    recurring_from = models.DateField(null=True, blank=True)
+    invoice_date = models.DateTimeField(default=timezone.now)
+    recurring_from = models.DateTimeField(null=True, blank=True)
     invoice_amount = models.DecimalField(max_digits=10, decimal_places=2)
     tax_value = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     total_including_tax = models.DecimalField(max_digits=10, decimal_places=2)
     payment_request_status = models.CharField(max_length=50)
     payment_status = models.CharField(max_length=50)
     mapping_status = models.CharField(max_length=50, null=True, blank=True)
-    created_at = models.DateTimeField(default=timezone.now)
-    updated_at = models.DateTimeField(default=timezone.now)
+    created_at = models.DateTimeField(
+        default=timezone.now, null=True, blank=True)
+    updated_at = models.DateTimeField(
+        default=timezone.now, null=True, blank=True)
 
 
 class PurchasePayment(models.Model):
-    date = models.DateField(default=timezone.now)
+    date = models.DateTimeField(default=timezone.now)
     amount = models.DecimalField(max_digits=10, decimal_places=2)
     payment_mode = models.CharField(max_length=50)
     purchase_order = models.ForeignKey(
         PurchaseOrder, on_delete=models.SET_NULL, null=True, blank=True)
     status = models.CharField(max_length=50)
     mapping_status = models.CharField(max_length=50, null=True, blank=True)
-    created_at = models.DateTimeField(default=timezone.now)
-    updated_at = models.DateTimeField(default=timezone.now)
+    created_at = models.DateTimeField(
+        default=timezone.now, null=True, blank=True)
+    updated_at = models.DateTimeField(
+        default=timezone.now, null=True, blank=True)
 
 
 class PurchaseOrderReturn(models.Model):
@@ -284,30 +344,34 @@ class PurchaseOrderReturn(models.Model):
     discount_total = models.DecimalField(
         max_digits=10, decimal_places=2, default=0)
     total_after_discount = models.DecimalField(max_digits=10, decimal_places=2)
-    date_created = models.DateField(default=timezone.now)
+    date_created = models.DateTimeField(default=timezone.now)
     status = models.CharField(max_length=50)
     mapping_status = models.CharField(max_length=50, null=True, blank=True)
-    created_at = models.DateTimeField(default=timezone.now)
-    updated_at = models.DateTimeField(default=timezone.now)
+    created_at = models.DateTimeField(
+        default=timezone.now, null=True, blank=True)
+    updated_at = models.DateTimeField(
+        default=timezone.now, null=True, blank=True)
 
 
 class PurchaseRefund(models.Model):
-    date = models.DateField(default=timezone.now)
+    date = models.DateTimeField(default=timezone.now)
     amount = models.DecimalField(max_digits=10, decimal_places=2)
     payment_mode = models.CharField(max_length=50)
     purchase_order_return = models.ForeignKey(
         PurchaseOrderReturn, on_delete=models.SET_NULL, null=True, blank=True)
     status = models.CharField(max_length=50)
     mapping_status = models.CharField(max_length=50, null=True, blank=True)
-    created_at = models.DateTimeField(default=timezone.now)
-    updated_at = models.DateTimeField(default=timezone.now)
+    created_at = models.DateTimeField(
+        default=timezone.now, null=True, blank=True)
+    updated_at = models.DateTimeField(
+        default=timezone.now, null=True, blank=True)
 
 # Transactions: Inventory
 
 
 class InventoryReceivingVoucher(models.Model):
     delivery_docket_code = models.CharField(max_length=100)
-    accounting_date = models.DateField(default=timezone.now)
+    accounting_date = models.DateTimeField(default=timezone.now)
     total_tax_amount = models.DecimalField(max_digits=10, decimal_places=2)
     total_goods_value = models.DecimalField(max_digits=10, decimal_places=2)
     value_of_inventory = models.DecimalField(max_digits=10, decimal_places=2)
@@ -316,20 +380,24 @@ class InventoryReceivingVoucher(models.Model):
     mapping_status = models.CharField(max_length=50, null=True, blank=True)
     # Add through model if quantities needed
     items = models.ManyToManyField(Item)
-    created_at = models.DateTimeField(default=timezone.now)
-    updated_at = models.DateTimeField(default=timezone.now)
+    created_at = models.DateTimeField(
+        default=timezone.now, null=True, blank=True)
+    updated_at = models.DateTimeField(
+        default=timezone.now, null=True, blank=True)
 
 
 class StockExport(models.Model):
     inventory_delivery_voucher_code = models.CharField(max_length=100)
     customer = models.ForeignKey(
         Party, on_delete=models.CASCADE, limit_choices_to={'type': 'customer'})
-    accounting_date = models.DateField(default=timezone.now)
+    accounting_date = models.DateTimeField(default=timezone.now)
     invoices = models.ManyToManyField(SalesInvoice, blank=True)
     status = models.CharField(max_length=50)
     mapping_status = models.CharField(max_length=50, null=True, blank=True)
-    created_at = models.DateTimeField(default=timezone.now)
-    updated_at = models.DateTimeField(default=timezone.now)
+    created_at = models.DateTimeField(
+        default=timezone.now, null=True, blank=True)
+    updated_at = models.DateTimeField(
+        default=timezone.now, null=True, blank=True)
 
 
 class LossAdjustment(models.Model):
@@ -338,8 +406,10 @@ class LossAdjustment(models.Model):
     status = models.CharField(max_length=50)
     mapping_status = models.CharField(max_length=50, null=True, blank=True)
     items = models.ManyToManyField(Item)
-    created_at = models.DateTimeField(default=timezone.now)
-    updated_at = models.DateTimeField(default=timezone.now)
+    created_at = models.DateTimeField(
+        default=timezone.now, null=True, blank=True)
+    updated_at = models.DateTimeField(
+        default=timezone.now, null=True, blank=True)
 
 
 class OpeningStock(models.Model):
@@ -349,8 +419,10 @@ class OpeningStock(models.Model):
     opening_stock = models.IntegerField()
     mapping_status = models.CharField(max_length=50, null=True, blank=True)
     item = models.ForeignKey(Item, on_delete=models.CASCADE)
-    created_at = models.DateTimeField(default=timezone.now)
-    updated_at = models.DateTimeField(default=timezone.now)
+    created_at = models.DateTimeField(
+        default=timezone.now, null=True, blank=True)
+    updated_at = models.DateTimeField(
+        default=timezone.now, null=True, blank=True)
 
 # Transactions: Manufacturing
 
@@ -366,8 +438,10 @@ class ManufacturingOrder(models.Model):
     routing = models.CharField(max_length=255, null=True, blank=True)
     status = models.CharField(max_length=50)
     mapping_status = models.CharField(max_length=50, null=True, blank=True)
-    created_at = models.DateTimeField(default=timezone.now)
-    updated_at = models.DateTimeField(default=timezone.now)
+    created_at = models.DateTimeField(
+        default=timezone.now, null=True, blank=True)
+    updated_at = models.DateTimeField(
+        default=timezone.now, null=True, blank=True)
 
 # Transactions: Fixed Equipment (Assets, etc.)
 
@@ -379,26 +453,30 @@ class Asset(models.Model):
     model = models.CharField(max_length=255)
     model_no = models.CharField(max_length=100)
     category = models.CharField(max_length=255)
-    purchase_date = models.DateField(null=True, blank=True)
+    purchase_date = models.DateTimeField(null=True, blank=True)
     purchase_cost = models.DecimalField(max_digits=10, decimal_places=2)
     status = models.CharField(max_length=50)
     mapping_status = models.CharField(max_length=50, null=True, blank=True)
-    created_at = models.DateTimeField(default=timezone.now)
-    updated_at = models.DateTimeField(default=timezone.now)
+    created_at = models.DateTimeField(
+        default=timezone.now, null=True, blank=True)
+    updated_at = models.DateTimeField(
+        default=timezone.now, null=True, blank=True)
 
 
 class License(models.Model):
     product_key = models.CharField(max_length=255)
-    expiration_date = models.DateField(null=True, blank=True)
+    expiration_date = models.DateTimeField(null=True, blank=True)
     licensed_to_email = models.EmailField()
     licensed_to_name = models.CharField(max_length=255)
     manufacturer = models.CharField(max_length=255)
     total = models.IntegerField()
-    purchase_date = models.DateField(null=True, blank=True)
+    purchase_date = models.DateTimeField(null=True, blank=True)
     purchase_cost = models.DecimalField(max_digits=10, decimal_places=2)
     mapping_status = models.CharField(max_length=50, null=True, blank=True)
-    created_at = models.DateTimeField(default=timezone.now)
-    updated_at = models.DateTimeField(default=timezone.now)
+    created_at = models.DateTimeField(
+        default=timezone.now, null=True, blank=True)
+    updated_at = models.DateTimeField(
+        default=timezone.now, null=True, blank=True)
 
 
 class Component(models.Model):
@@ -410,11 +488,13 @@ class Component(models.Model):
     min_quantity = models.IntegerField()
     location = models.CharField(max_length=255)
     order_number = models.CharField(max_length=100)
-    purchase_date = models.DateField(null=True, blank=True)
+    purchase_date = models.DateTimeField(null=True, blank=True)
     purchase_cost = models.DecimalField(max_digits=10, decimal_places=2)
     mapping_status = models.CharField(max_length=50, null=True, blank=True)
-    created_at = models.DateTimeField(default=timezone.now)
-    updated_at = models.DateTimeField(default=timezone.now)
+    created_at = models.DateTimeField(
+        default=timezone.now, null=True, blank=True)
+    updated_at = models.DateTimeField(
+        default=timezone.now, null=True, blank=True)
 
 
 class Consumable(models.Model):
@@ -429,8 +509,10 @@ class Consumable(models.Model):
     avail = models.IntegerField()
     purchase_cost = models.DecimalField(max_digits=10, decimal_places=2)
     mapping_status = models.CharField(max_length=50, null=True, blank=True)
-    created_at = models.DateTimeField(default=timezone.now)
-    updated_at = models.DateTimeField(default=timezone.now)
+    created_at = models.DateTimeField(
+        default=timezone.now, null=True, blank=True)
+    updated_at = models.DateTimeField(
+        default=timezone.now, null=True, blank=True)
 
 
 class Maintenance(models.Model):
@@ -439,21 +521,25 @@ class Maintenance(models.Model):
     location = models.CharField(max_length=255)
     maintenance_type = models.CharField(max_length=50)
     title = models.CharField(max_length=255)
-    start_date = models.DateField()
-    completion_date = models.DateField(null=True, blank=True)
+    start_date = models.DateTimeField()
+    completion_date = models.DateTimeField(null=True, blank=True)
     notes = models.TextField(null=True, blank=True)
-    created_at = models.DateTimeField(default=timezone.now)
-    updated_at = models.DateTimeField(default=timezone.now)
+    created_at = models.DateTimeField(
+        default=timezone.now, null=True, blank=True)
+    updated_at = models.DateTimeField(
+        default=timezone.now, null=True, blank=True)
 
 
 class Depreciation(models.Model):
     serial_number = models.CharField(max_length=100)
     asset = models.ForeignKey(Asset, on_delete=models.CASCADE)
     amount = models.DecimalField(max_digits=10, decimal_places=2)
-    date = models.DateField(default=timezone.now)
+    date = models.DateTimeField(default=timezone.now)
     mapping_status = models.CharField(max_length=50, null=True, blank=True)
-    created_at = models.DateTimeField(default=timezone.now)
-    updated_at = models.DateTimeField(default=timezone.now)
+    created_at = models.DateTimeField(
+        default=timezone.now, null=True, blank=True)
+    updated_at = models.DateTimeField(
+        default=timezone.now, null=True, blank=True)
 
 # Billitems
 
@@ -477,11 +563,11 @@ class Bill(models.Model):
     ]
     vendor = models.ForeignKey(
         Party, on_delete=models.CASCADE, limit_choices_to={'type': 'vendor'})
-    bill_date = models.DateField(default=timezone.now)
+    bill_date = models.DateTimeField(default=timezone.now)
     name = models.CharField(max_length=255, null=True, blank=True)  # Optional
     reference = models.CharField(max_length=100)
     memo = models.TextField(null=True, blank=True)
-    due_date = models.DateField()
+    due_date = models.DateTimeField()
     attachment = models.FileField(upload_to='bills/', null=True, blank=True)
     debit_account = models.ForeignKey(
         Account, on_delete=models.SET_NULL, null=True, blank=True, related_name='debit_bills')
@@ -493,8 +579,10 @@ class Bill(models.Model):
         BillItem, related_name='billitems', blank=True)
     bill_type = models.CharField(
         max_length=50, choices=BILL_TYPE_CHOICES, default='withdrawal')
-    created_at = models.DateTimeField(default=timezone.now)
-    updated_at = models.DateTimeField(default=timezone.now)
+    created_at = models.DateTimeField(
+        default=timezone.now, null=True, blank=True)
+    updated_at = models.DateTimeField(
+        default=timezone.now, null=True, blank=True)
 
 
 # Checks
@@ -512,23 +600,27 @@ class Check(models.Model):
     memo = models.TextField(null=True, blank=True)
     sign = models.CharField(max_length=255, null=True,
                             blank=True)  # Signature field?
-    date = models.DateField(default=timezone.now)
+    date = models.DateTimeField(default=timezone.now)
     vendor = models.ForeignKey(Party, on_delete=models.SET_NULL,
                                null=True, blank=True, limit_choices_to={'type': 'vendor'})
     check_type = models.CharField(
         max_length=50, choices=CHECK_TYPE_CHOICES, default='withdrawal')
     status = models.CharField(max_length=50, default='issued')
-    created_at = models.DateTimeField(default=timezone.now)
-    updated_at = models.DateTimeField(default=timezone.now)
+    created_at = models.DateTimeField(
+        default=timezone.now, null=True, blank=True)
+    updated_at = models.DateTimeField(
+        default=timezone.now, null=True, blank=True)
 
  # Journal Entry (General ledger entries, connecting to accounts)
 
 
 class JournalEntry(models.Model):
-    date = models.DateField(default=timezone.now)
+    date = models.DateTimeField(default=timezone.now)
     description = models.TextField(null=True, blank=True)
-    created_at = models.DateTimeField(default=timezone.now)
-    updated_at = models.DateTimeField(default=timezone.now)
+    created_at = models.DateTimeField(
+        default=timezone.now, null=True, blank=True)
+    updated_at = models.DateTimeField(
+        default=timezone.now, null=True, blank=True)
 
 
 class JournalEntryLine(models.Model):
@@ -551,5 +643,7 @@ class Convert(models.Model):
         max_digits=10, decimal_places=2, null=True, blank=True)
     description = models.TextField(null=True, blank=True)
     transfer_date = models.DateTimeField(default=timezone.now)
-    created_at = models.DateTimeField(default=timezone.now)
-    updated_at = models.DateTimeField(default=timezone.now)
+    created_at = models.DateTimeField(
+        default=timezone.now, null=True, blank=True)
+    updated_at = models.DateTimeField(
+        default=timezone.now, null=True, blank=True)

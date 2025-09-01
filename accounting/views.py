@@ -5,6 +5,7 @@ from rest_framework import status
 from .models import (
     Account, AccountName, BankTransaction, Party,
     Item, SalesPayment, SalesInvoice, SalesOrderReturn, SalesRefund,
+    Order,
     Expense, Payslip, PurchaseOrder, PurchaseInvoice, PurchasePayment,
     PurchaseOrderReturn, PurchaseRefund, InventoryReceivingVoucher, StockExport,
     LossAdjustment,
@@ -13,8 +14,10 @@ from .models import (
 )
 from .serializers import (
     AccountSerializer, AccountNameSerializer, BankTransactionSerializer, PartySerializer,
-    ItemSerializer, SalesPaymentSerializer, SalesInvoiceSerializer, SalesInvoiceCreateUpdateSerializer, SalesOrderReturnSerializer, SalesRefundSerializer,
-    ExpenseSerializer, PayslipSerializer, PurchaseOrderSerializer, PurchaseInvoiceSerializer, PurchasePaymentSerializer,
+    ItemSerializer,
+    SalesPaymentSerializer, SalesInvoiceRead, SalesInvoiceWrite, SalesOrderReturnSerializer, SalesRefundSerializer,
+    SalesOrderReturnCreateUpdateSerializer, OrderReadSerializer, OrderWriteSerializer,
+    ExpenseReadSerializer, ExpenseWriteSerializer, PayslipSerializer, PurchaseOrderSerializer, PurchaseInvoiceSerializer, PurchasePaymentSerializer,
     PurchaseOrderReturnSerializer, PurchaseRefundSerializer, InventoryReceivingVoucherSerializer, StockExportSerializer,
     LossAdjustmentSerializer, OpeningStockSerializer, ManufacturingOrderSerializer, AssetSerializer, LicenseSerializer,
     ComponentSerializer, ConsumableSerializer, MaintenanceSerializer, DepreciationSerializer, BillSerializer, BillCreateUpdateSerializer, CheckSerializer, CheckCreateUpdateSerializer,
@@ -57,13 +60,26 @@ class SalesInvoiceViewSet(viewsets.ModelViewSet):
 
     def get_serializer_class(self):
         if self.action in ['list', 'retrieve']:
-            return SalesInvoiceSerializer
-        return SalesInvoiceCreateUpdateSerializer
+            return SalesInvoiceRead
+        return SalesInvoiceWrite
+
+
+class OrderViewSet(viewsets.ModelViewSet):
+    queryset = Order.objects.all().order_by('-order_date')
+
+    def get_serializer_class(self):
+        if self.action in ['list', 'retrieve']:
+            return OrderReadSerializer
+        return OrderWriteSerializer
 
 
 class SalesOrderReturnViewSet(viewsets.ModelViewSet):
     queryset = SalesOrderReturn.objects.all()
-    serializer_class = SalesOrderReturnSerializer
+
+    def get_serializer_class(self):
+        if self.action in ['list', 'retrieve']:
+            return SalesOrderReturnSerializer
+        return SalesOrderReturnCreateUpdateSerializer
 
 
 class SalesRefundViewSet(viewsets.ModelViewSet):
@@ -73,7 +89,11 @@ class SalesRefundViewSet(viewsets.ModelViewSet):
 
 class ExpenseViewSet(viewsets.ModelViewSet):
     queryset = Expense.objects.all()
-    serializer_class = ExpenseSerializer
+
+    def get_serializer_class(self):
+        if self.action in ['list', 'retrieve']:
+            return ExpenseReadSerializer
+        return ExpenseWriteSerializer
 
 
 class PayslipViewSet(viewsets.ModelViewSet):

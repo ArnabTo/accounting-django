@@ -1,22 +1,12 @@
 import logging
-from .models import Account, SalesInvoice
 from django.db.models.signals import pre_save, post_save, pre_delete
 from django.dispatch import receiver
 from .models import (
     Account, BankTransaction, SalesInvoice, SalesPayment, SalesRefund, Expense,
     PurchaseInvoice, PurchasePayment, PurchaseRefund, Bill, Check, JournalEntryLine,
-    InventoryReceivingVoucher, StockExport, LossAdjustment, Depreciation, ManufacturingOrder
+    InventoryReceivingVoucher, StockExport, LossAdjustment, Depreciation, ManufacturingOrder, Order, OrderItem
 )
-
-# Helper function to update account balance
-# Assumption: Account.balance is a simplified net balance.
-# - For debit-normal accounts (e.g., assets, expenses), debit increases balance, credit decreases.
-# - For credit-normal accounts (e.g., liabilities, revenue), credit increases balance, debit decreases.
-# For simplicity, we assume Account.balance is affected as:
-# - debit_account.balance += amount for debit entries
-# - credit_account.balance += amount for credit entries (assuming positive balance for credit-normal accounts)
-# If account_type matters, we can add logic to check 'debit'/'credit' type, but for now, keep it straightforward.
-# This is a simplification; real accounting ensures debits = credits, but we update per account.
+from django.db import transaction
 
 
 def update_account_balance(account, amount_delta):
@@ -523,3 +513,118 @@ def update_manufacturing_order_balance(sender, instance, created, **kwargs):
 @receiver(pre_delete, sender=ManufacturingOrder)
 def reverse_manufacturing_order_balance(sender, instance, **kwargs):
     pass
+
+
+# OrderItem signal
+
+@receiver(post_save, sender=OrderItem)
+def update_order_total(sender, instance, **kwargs):
+    """
+    Update order total when OrderItem is saved or deleted
+    """
+    if instance.order:
+        # Use atomic transaction to ensure consistency
+        with transaction.atomic():
+            instance.order.calculate_total()
+
+
+@receiver(post_save, sender=OrderItem)
+def order_item_delete_handler(sender, instance, **kwargs):
+    """
+    Handle order item deletion to update total
+    """
+    if kwargs.get('created', False) or instance.order:
+        update_order_total(sender, instance, **kwargs)
+
+
+@receiver(post_save, sender=Order)
+def create_sales_invoice_and_payment(sender, instance, created, **kwargs):
+    """
+    Create SalesInvoice and SalesPayment when Order is created
+    """
+    if created and instance.total_amount > 0:
+        with transaction.atomic():
+            # Get or create default accounts
+            debit_account = Account.objects.filter(
+                account_type='debit').first()
+            credit_account = Account.objects.filter(
+                account_type='credit').first()
+
+            # Create SalesInvoice
+            invoice = SalesInvoice.objects.create(
+                order=instance,
+                date=instance.order_date,
+                amount=instance.total_amount,
+                customer=instance.customer,
+                status='open',
+                debit_account=debit_account,
+                credit_account=credit_account,
+                created_at=timezone.now(),
+                updated_at=timezone.now()
+            )
+
+            # Create SalesPayment based on payment mode
+            payment_status = 'paid' if instance.payment_mode == 'cash' else 'pending'
+
+            SalesPayment.objects.create(
+                date=instance.order_date,
+                amount=instance.total_amount,
+                payment_mode=instance.payment_mode,
+                invoice=invoice,
+                status=payment_status,
+                mapping_status='auto_created',
+                created_at=timezone.now(),
+                updated_at=timezone.now()
+            )
+
+
+@receiver(pre_save, sender=Order)
+def update_related_invoice_and_payment(sender, instance, **kwargs):
+    """
+    Update related SalesInvoice and SalesPayment when Order is updated
+    """
+    if not instance.pk:
+        return  # New instance, no update needed
+
+    try:
+        old_instance = Order.objects.get(pk=instance.pk)
+    except Order.DoesNotExist:
+        return
+
+    # Check if total amount changed
+    if old_instance.total_amount != instance.total_amount:
+        with transaction.atomic():
+            # Update related invoice
+            invoices = SalesInvoice.objects.filter(order=instance)
+            for invoice in invoices:
+                invoice.amount = instance.total_amount
+                invoice.updated_at = timezone.now()
+                invoice.save()
+
+            # Update related payments
+            payments = SalesPayment.objects.filter(invoice__order=instance)
+            for payment in payments:
+                payment.amount = instance.total_amount
+                payment.updated_at = timezone.now()
+                payment.save()
+
+
+@receiver(post_save, sender=Order)
+def handle_order_payment_mode_change(sender, instance, created, **kwargs):
+    """
+    Handle payment mode changes and update payment status
+    """
+    if not created:
+        try:
+            old_instance = Order.objects.get(pk=instance.pk)
+            if old_instance.payment_mode != instance.payment_mode:
+                with transaction.atomic():
+                    payments = SalesPayment.objects.filter(
+                        invoice__order=instance)
+                    for payment in payments:
+                        payment.payment_mode = instance.payment_mode
+                        payment.status = 'paid' if instance.payment_mode == 'cash' else 'pending'
+                        payment.updated_at = timezone.now()
+                        payment.save()
+        except Order.DoesNotExist:
+            pass
