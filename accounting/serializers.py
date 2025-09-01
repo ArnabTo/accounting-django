@@ -93,11 +93,17 @@ class InvoiceItemSerializer(serializers.ModelSerializer):
 
 
 class SalesInvoiceSerializer(serializers.ModelSerializer):
-    items = InvoiceItemSerializer(many=True, read_only=True)
-    customer = PartySerializer()
-    debit_account = AccountSerializer()
-    credit_account = AccountSerializer()
+    items = ItemSerializer(many=True, read_only=True)
+    customer = PartySerializer(read_only=True)
+    debit_account = AccountSerializer(read_only=True)
+    credit_account = AccountSerializer(read_only=True)
 
+    class Meta:
+        model = SalesInvoice
+        fields = '__all__'
+
+
+class SalesInvoiceCreateUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = SalesInvoice
         fields = '__all__'

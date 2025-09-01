@@ -137,32 +137,31 @@ class SalesPayment(models.Model):
     created_at = models.DateTimeField(default=timezone.now)
     updated_at = models.DateTimeField(default=timezone.now)
 
+# Intermediate for line items in invoices/bills/etc.
+
+
+class InvoiceItem(models.Model):
+    item = models.ForeignKey(Item, on_delete=models.CASCADE)
+    description = models.TextField(null=True, blank=True)
+    quantity = models.IntegerField(default=1)
+    cost = models.DecimalField(max_digits=10, decimal_places=2)
+    amount = models.DecimalField(max_digits=10, decimal_places=2)
+
 
 class SalesInvoice(models.Model):
-    date = models.DateField(default=timezone.now)
+    date = models.DateTimeField(default=timezone.now)
     amount = models.DecimalField(max_digits=10, decimal_places=2)
     customer = models.ForeignKey(
-        Party, on_delete=models.CASCADE, limit_choices_to={'type': 'customer'})
+        Party, on_delete=models.CASCADE)
     status = models.CharField(max_length=50, default='open')
-    mapping_status = models.CharField(max_length=50, null=True, blank=True)
     items = models.ManyToManyField(
-        Item, through='InvoiceItem')
+        InvoiceItem, related_name='invoiceitems', blank=True)
     debit_account = models.ForeignKey(
         Account, on_delete=models.SET_NULL, null=True, blank=True, related_name='debit_invoices')
     credit_account = models.ForeignKey(
         Account, on_delete=models.SET_NULL, null=True, blank=True, related_name='credit_invoices')
     created_at = models.DateTimeField(default=timezone.now)
     updated_at = models.DateTimeField(default=timezone.now)
-
-
-# Intermediate for line items in invoices/bills/etc.
-class InvoiceItem(models.Model):
-    invoice = models.ForeignKey(SalesInvoice, on_delete=models.CASCADE)
-    item = models.ForeignKey(Item, on_delete=models.CASCADE)
-    description = models.TextField(null=True, blank=True)
-    quantity = models.IntegerField(default=1)
-    cost = models.DecimalField(max_digits=10, decimal_places=2)
-    amount = models.DecimalField(max_digits=10, decimal_places=2)
 
 
 class SalesOrderReturn(models.Model):
