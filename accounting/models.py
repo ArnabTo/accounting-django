@@ -460,7 +460,8 @@ class Depreciation(models.Model):
 
 
 class BillItem(models.Model):
-    item = models.ManyToManyField(Item, blank=True)
+    item = models.ForeignKey(
+        Item, on_delete=models.CASCADE, blank=True, null=True)
     description = models.TextField(null=True, blank=True)
     quantity = models.IntegerField(default=1, null=True, blank=True)
     cost = models.DecimalField(
@@ -489,8 +490,8 @@ class Bill(models.Model):
         Account, on_delete=models.SET_NULL, null=True, blank=True, related_name='credit_bills')
     amount = models.DecimalField(max_digits=10, decimal_places=2)
     status = models.CharField(max_length=50, default='open')
-    items = models.ForeignKey(
-        BillItem, on_delete=models.CASCADE, related_name='billitems')
+    items = models.ManyToManyField(
+        BillItem, related_name='billitems', blank=True)
     bill_type = models.CharField(
         max_length=50, choices=BILL_TYPE_CHOICES, default='withdrawal')
     created_at = models.DateTimeField(default=timezone.now)

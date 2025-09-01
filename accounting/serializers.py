@@ -276,243 +276,51 @@ class DepreciationSerializer(serializers.ModelSerializer):
 
 
 class BillItemSerializer(serializers.ModelSerializer):
-    item_details = serializers.SerializerMethodField(read_only=True)
+    item_details = ItemSerializer(read_only=True)
 
     class Meta:
         model = BillItem
-        fields = [
-            'id',
-            'item',
-            'item_details',
-            'description',
-            'quantity',
-            'cost',
-            'amount'
-        ]
+        fields = '__all__'
 
-    def get_item_details(self, obj):
-        """Return item details for display purposes"""
-        if obj.item.exists():
-            items = obj.item.all()
-            return [
-                {
-                    'id': item.id,
-                    'name': item.name,
-                    'sku': item.sku,
-                    'type': item.type
-                }
-                for item in items
-            ]
-        return []
 
-    def validate(self, data):
-        """Custom validation for BillItem"""
-        quantity = data.get('quantity', 0)
-        cost = data.get('cost', 0)
-
-        if quantity <= 0:
-            raise serializers.ValidationError(
-                "Quantity must be greater than 0")
-
-        if cost < 0:
-            raise serializers.ValidationError("Cost cannot be negative")
-
-        return data
-
-    def create(self, validated_data):
-        """Custom create logic for BillItem"""
-        # Calculate amount if not provided
-        if 'amount' not in validated_data:
-            validated_data['amount'] = validated_data['quantity'] * \
-                validated_data['cost']
-
-        # Extract many-to-many data
-        items_data = validated_data.pop('item', [])
-
-        # Create the BillItem instance
-        bill_item = BillItem.objects.create(**validated_data)
-
-        # Set many-to-many relationships
-        if items_data:
-            bill_item.item.set(items_data)
-
-        return bill_item
-
-    def update(self, instance, validated_data):
-        """Custom update logic for BillItem"""
-        # Extract many-to-many data
-        items_data = validated_data.pop('item', None)
-
-        # Update basic fields
-        for attr, value in validated_data.items():
-            setattr(instance, attr, value)
-
-        # Recalculate amount if quantity or cost changed
-        if 'quantity' in validated_data or 'cost' in validated_data:
-            instance.amount = instance.quantity * instance.cost
-
-        instance.save()
-
-        # Update many-to-many relationships
-        if items_data is not None:
-            instance.item.set(items_data)
-
-        return instance
-
+class BillItemCreateUpdateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = BillItem
+        fields = '__all__'
 
 # Bill Serializer
 
 
 class BillSerializer(serializers.ModelSerializer):
-    vendor_name = serializers.CharField(source='vendor.name', read_only=True)
-    debit_account_name = serializers.CharField(
-        source='debit_account.name', read_only=True)
-    credit_account_name = serializers.CharField(
-        source='credit_account.name', read_only=True)
-    items_details = BillItemSerializer(
-        source='billitems', many=True, read_only=True)
+    items = BillItemSerializer(many=True, read_only=True)
+    vendor = PartySerializer(read_only=True)
+    debit_account = AccountSerializer(read_only=True)
+    credit_account = AccountSerializer(read_only=True)
 
     class Meta:
         model = Bill
-        fields = [
-            'id',
-            'vendor',
-            'vendor_name',
-            'bill_date',
-            'name',
-            'reference',
-            'memo',
-            'due_date',
-            'attachment',
-            'debit_account',
-            'debit_account_name',
-            'credit_account',
-            'credit_account_name',
-            'amount',
-            'status',
-            'items',
-            'items_details',
-            'bill_type',
-            'created_at',
-            'updated_at'
-        ]
-        read_only_fields = ['created_at', 'updated_at']
+        fields = '__all__'
 
-    def validate(self, data):
-        """Custom validation for Bill"""
-        bill_date = data.get('bill_date')
-        due_date = data.get('due_date')
 
-        if due_date and bill_date and due_date < bill_date:
-            raise serializers.ValidationError(
-                "Due date cannot be earlier than bill date")
+class BillCreateUpdateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Bill
+        fields = '__all__'
 
-        amount = data.get('amount', 0)
-        if amount < 0:
-            raise serializers.ValidationError("Amount cannot be negative")
-
-        return data
-
-    def validate_vendor(self, value):
-        """Validate that the vendor is actually a vendor type party"""
-        if value and value.type != 'vendor':
-            raise serializers.ValidationError(
-                "Selected party must be a vendor")
-        return value
-
-    def validate_reference(self, value):
-        """Ensure reference is unique"""
-        if self.instance:
-            # For updates, exclude current instance
-            if Bill.objects.filter(reference=value).exclude(id=self.instance.id).exists():
-                raise serializers.ValidationError(
-                    "Bill with this reference already exists")
-        else:
-            # For creation
-            if Bill.objects.filter(reference=value).exists():
-                raise serializers.ValidationError(
-                    "Bill with this reference already exists")
-        return value
-
-    @transaction.atomic
-    def create(self, validated_data):
-        """Custom create logic for Bill"""
-        # Set created_at and updated_at
-        validated_data['created_at'] = timezone.now()
-        validated_data['updated_at'] = timezone.now()
-
-        # Create the bill instance
-        bill = Bill.objects.create(**validated_data)
-
-        # If bill_type is withdrawal, ensure we have proper accounts set
-        if bill.bill_type == 'withdrawal' and not bill.credit_account:
-            # You might want to set a default account or raise validation error
-            pass
-
-        return bill
-
-    @transaction.atomic
-    def update(self, instance, validated_data):
-        """Custom update logic for Bill"""
-        # Update the updated_at field
-        validated_data['updated_at'] = timezone.now()
-
-        # Store old status for comparison
-        old_status = instance.status
-        new_status = validated_data.get('status', old_status)
-
-        # Update basic fields
-        for attr, value in validated_data.items():
-            setattr(instance, attr, value)
-
-        # Custom logic when status changes
-        if old_status != new_status:
-            self._handle_status_change(instance, old_status, new_status)
-
-        instance.save()
-        return instance
-
-    def _handle_status_change(self, instance, old_status, new_status):
-        """Handle business logic when bill status changes"""
-        if new_status == 'paid':
-            # Logic when bill is marked as paid
-            # e.g., create journal entries, update inventory, etc.
-            pass
-        elif new_status == 'cancelled':
-            # Logic when bill is cancelled
-            pass
-        elif new_status == 'overdue':
-            # Logic for overdue bills
-            # e.g., send notifications, apply penalties, etc.
-            pass
-
-    def to_representation(self, instance):
-        """Customize the output representation"""
-        data = super().to_representation(instance)
-
-        # Add computed fields
-        data['days_until_due'] = None
-        if instance.due_date:
-            from datetime import date
-            today = date.today()
-            days_diff = (instance.due_date - today).days
-            data['days_until_due'] = days_diff
-            data['is_overdue'] = days_diff < 0
-
-        # Add total items count
-        if hasattr(instance, 'billitems'):
-            data['total_items'] = instance.billitems.count(
-            ) if instance.billitems else 0
-
-        return data
 
 # Check Serializer
 
 
+class CheckCreateUpdateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Check
+        fields = '__all__'
+
+
 class CheckSerializer(serializers.ModelSerializer):
-    # pay_to = AccountSerializer(read_only=True)
-    # bank_account = AccountSerializer(read_only=True)
-    # vendor = PartySerializer(read_only=True)
+    pay_to = AccountSerializer(read_only=True)
+    bank_account = AccountSerializer(read_only=True)
+    vendor = PartySerializer(read_only=True)
 
     class Meta:
         model = Check
