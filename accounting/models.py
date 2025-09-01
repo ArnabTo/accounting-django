@@ -538,3 +538,18 @@ class JournalEntryLine(models.Model):
     debit = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     credit = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     description = models.TextField(null=True, blank=True)
+
+# Convert
+
+
+class Convert(models.Model):
+    transfer_from = models.ForeignKey(
+        Account, on_delete=models.CASCADE, related_name='transfer_from')
+    transfer_to = models.ForeignKey(
+        Account, on_delete=models.CASCADE, related_name='transfer_to')
+    transfer_amount = models.DecimalField(
+        max_digits=10, decimal_places=2, null=True, blank=True)
+    description = models.TextField(null=True, blank=True)
+    transfer_date = models.DateTimeField(default=timezone.now)
+    created_at = models.DateTimeField(default=timezone.now)
+    updated_at = models.DateTimeField(default=timezone.now)

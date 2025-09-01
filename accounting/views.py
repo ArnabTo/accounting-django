@@ -9,7 +9,7 @@ from .models import (
     PurchaseOrderReturn, PurchaseRefund, InventoryReceivingVoucher, StockExport,
     LossAdjustment,
     OpeningStock, ManufacturingOrder, Asset, License, Component, Consumable,
-    Maintenance, Depreciation, Bill, Check, JournalEntry, BillItem
+    Maintenance, Depreciation, Bill, Check, JournalEntry, BillItem, Convert
 )
 from .serializers import (
     AccountSerializer, AccountNameSerializer, BankTransactionSerializer, PartySerializer,
@@ -18,7 +18,7 @@ from .serializers import (
     PurchaseOrderReturnSerializer, PurchaseRefundSerializer, InventoryReceivingVoucherSerializer, StockExportSerializer,
     LossAdjustmentSerializer, OpeningStockSerializer, ManufacturingOrderSerializer, AssetSerializer, LicenseSerializer,
     ComponentSerializer, ConsumableSerializer, MaintenanceSerializer, DepreciationSerializer, BillSerializer, CheckSerializer,
-    JournalEntrySerializer, BillItemSerializer
+    JournalEntrySerializer, BillItemSerializer, ConvertCreateSerializer, ConvertSerializer
 )
 
 
@@ -349,3 +349,12 @@ class CheckViewSet(viewsets.ModelViewSet):
 class JournalEntryViewSet(viewsets.ModelViewSet):
     queryset = JournalEntry.objects.all()
     serializer_class = JournalEntrySerializer
+
+
+class ConvertViewSet(viewsets.ModelViewSet):
+    queryset = Convert.objects.all().order_by('-created_at')
+
+    def get_serializer_class(self):
+        if self.action in ['list', 'retrieve']:
+            return ConvertSerializer   # For GET
+        return ConvertCreateSerializer  # For POST/PUT/PATCH

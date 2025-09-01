@@ -14,7 +14,7 @@ from .views import (
     ManufacturingOrderViewSet, AssetViewSet, LicenseViewSet,
     ComponentViewSet, ConsumableViewSet, MaintenanceViewSet,
     DepreciationViewSet, BillViewSet, BillItemViewSet, CheckViewSet,
-    JournalEntryViewSet,
+    JournalEntryViewSet, ConvertViewSet
 )
 
 router = DefaultRouter()
@@ -50,7 +50,7 @@ router.register(r'bills', BillViewSet)
 router.register(r'bill-items', BillItemViewSet)
 router.register(r'checks', CheckViewSet)
 router.register(r'journal-entries', JournalEntryViewSet)
-
+router.register(r'converts', ConvertViewSet)
 urlpatterns = [
     path('', include(router.urls)),
 ]

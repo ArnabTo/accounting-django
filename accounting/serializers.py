@@ -9,7 +9,7 @@ from .models import (
     PurchaseInvoice, PurchasePayment, PurchaseOrderReturn, PurchaseRefund,
     InventoryReceivingVoucher, StockExport, LossAdjustment, OpeningStock,
     ManufacturingOrder, Asset, License, Component, Consumable, Maintenance,
-    Depreciation, Bill, BillItem, Check, JournalEntry, JournalEntryLine
+    Depreciation, Bill, BillItem, Check, JournalEntry, JournalEntryLine, Convert
 )
 from django.utils import timezone
 
@@ -510,9 +510,9 @@ class BillSerializer(serializers.ModelSerializer):
 
 
 class CheckSerializer(serializers.ModelSerializer):
-    pay_to = AccountSerializer(read_only=True)
-    bank_account = AccountSerializer(read_only=True)
-    vendor = PartySerializer(read_only=True)
+    # pay_to = AccountSerializer(read_only=True)
+    # bank_account = AccountSerializer(read_only=True)
+    # vendor = PartySerializer(read_only=True)
 
     class Meta:
         model = Check
@@ -534,4 +534,19 @@ class JournalEntrySerializer(serializers.ModelSerializer):
 
     class Meta:
         model = JournalEntry
+        fields = '__all__'
+
+
+class ConvertCreateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Convert
+        fields = '__all__'
+
+
+class ConvertSerializer(serializers.ModelSerializer):
+    transfer_from = AccountSerializer(read_only=True)
+    transfer_to = AccountSerializer(read_only=True)
+
+    class Meta:
+        model = Convert
         fields = '__all__'
