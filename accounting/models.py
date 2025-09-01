@@ -568,7 +568,8 @@ class Bill(models.Model):
     reference = models.CharField(max_length=100)
     memo = models.TextField(null=True, blank=True)
     due_date = models.DateTimeField()
-    attachment = models.FileField(upload_to='bills/', null=True, blank=True)
+    attachment = models.FileField(
+        upload_to='assets/uploads/bills/', null=True, blank=True)
     debit_account = models.ForeignKey(
         Account, on_delete=models.SET_NULL, null=True, blank=True, related_name='debit_bills')
     credit_account = models.ForeignKey(
