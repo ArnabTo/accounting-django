@@ -51,6 +51,7 @@ class BankTransactionSerializer(serializers.ModelSerializer):
     class Meta:
         model = BankTransaction
         fields = '__all__'
+        # Added comment for tracking changes
 
 # Party Serializer
 
