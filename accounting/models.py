@@ -67,8 +67,14 @@ class Party(models.Model):  # For Customers, Vendors, Staff, etc.
         max_length=50, choices=PARTY_TYPE_CHOICES, default='customer')
     name = models.CharField(max_length=255)
     email = models.EmailField(null=True, blank=True)
-    address = models.TextField(null=True, blank=True)
     phone = models.CharField(max_length=50, null=True, blank=True)
+
+    address = models.TextField(null=True, blank=True)
+    city = models.CharField(max_length=100, null=True, blank=True)
+    state = models.CharField(max_length=100, null=True, blank=True)
+    country = models.CharField(max_length=100, null=True, blank=True)
+    zip = models.CharField(max_length=100, null=True, blank=True)
+
     status = models.CharField(max_length=50, default='active')
     created_at = models.DateTimeField(
         default=timezone.now, null=True, blank=True)
