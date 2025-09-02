@@ -86,3 +86,21 @@ class PaymentInstallmentViewSet(viewsets.ModelViewSet):
         if payment_schedule_id:
             queryset = queryset.filter(payment_schedule_id=payment_schedule_id)
         return queryset
+
+
+class SalesPaymentViewSet(viewsets.ModelViewSet):
+    queryset = models.SalesPayment.objects.all()
+
+    def get_serializer_class(self):
+        if self.action in ['list', 'retrieve']:
+            return serializers.SalesPaymentReadSerializer
+        return serializers.SalesPaymentSerializer
+
+
+class SalesInvoiceViewSet(viewsets.ModelViewSet):
+    queryset = models.SalesInvoice.objects.all()
+
+    def get_serializer_class(self):
+        if self.action in ['list', 'retrieve']:
+            return serializers.SalesInvoiceReadSerializer
+        return serializers.SalesInvoiceSerializer

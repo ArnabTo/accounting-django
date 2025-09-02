@@ -2,6 +2,7 @@ from django.db import models
 from accounting.models import Party
 # Create your models here.
 from django.utils import timezone
+from accounting.models import Account
 
 
 class Brands(models.Model):
@@ -154,6 +155,44 @@ class SalesItems(models.Model):
 
     def __str__(self):
         return self.item.name
+
+
+class SalesInvoice(models.Model):
+    sales = models.ForeignKey(
+        Sales, on_delete=models.CASCADE, related_name='sales_invoice', null=True, blank=True)
+    date = models.DateTimeField(default=timezone.now)
+    amount = models.DecimalField(max_digits=10, decimal_places=2)
+    customer = models.ForeignKey(
+        Party, on_delete=models.CASCADE, related_name='sales_invoice_customer')
+    status = models.CharField(max_length=50, default='open')
+    debit_account = models.ForeignKey(
+        Account, on_delete=models.SET_NULL, null=True, blank=True, related_name='debit_invoice')
+    credit_account = models.ForeignKey(
+        Account, on_delete=models.SET_NULL, null=True, blank=True, related_name='credit_invoice')
+    created_at = models.DateTimeField(
+        default=timezone.now, null=True, blank=True)
+    updated_at = models.DateTimeField(
+        default=timezone.now, null=True, blank=True)
+
+    def __str__(self):
+        return f"Invoice {self.id} - {self.customer.name}"
+
+
+class SalesPayment(models.Model):
+    date = models.DateTimeField(default=timezone.now)
+    amount = models.DecimalField(max_digits=10, decimal_places=2)
+    payment_mode = models.CharField(max_length=50)
+    invoice = models.ForeignKey(
+        'SalesInvoice', on_delete=models.SET_NULL, null=True, blank=True, related_name='sales_payments')
+    status = models.CharField(max_length=50, default='paid')
+    mapping_status = models.CharField(max_length=50, null=True, blank=True)
+    created_at = models.DateTimeField(
+        default=timezone.now, null=True, blank=True)
+    updated_at = models.DateTimeField(
+        default=timezone.now, null=True, blank=True)
+
+    def __str__(self):
+        return f"Payment {self.id} - {self.invoice.sales.sales_no}"
 
 
 class PaymentSchedule(models.Model):

@@ -46,10 +46,42 @@ class SalesItemsReadSerializer(serializers.ModelSerializer):
         return data
 
 
+class PaymentInstallmentSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = models.PaymentInstallment
+        fields = ['id', 'payment_time', 'payment_amount',
+                  'status', 'created_at', 'updated_at']
+
+
 class PaymentScheduleReadSerializer(serializers.ModelSerializer):
+    installments = PaymentInstallmentSerializer(many=True, read_only=True)
+
     class Meta:
         model = models.PaymentSchedule
-        fields = ['id', 'advance_payment', 'rest_amount', ]
+        fields = ['id', 'advance_payment', 'rest_amount',
+                  'created_at', 'updated_at', 'installments']
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+
+        # Get the sales payment_mode to determine structure
+        sales = instance.sales
+
+        if sales.payment_mode == 'at_a_time':
+            print('here')
+            # For at_a_time, only return advance_payment and rest_amount
+            return {
+                'advance_payment': data['advance_payment'],
+                'rest_amount': data['rest_amount']
+            }
+        else:
+            print('there')
+            # For installment, return full structure
+            return {
+                'advance_payment': data['advance_payment'],
+                'rest_amount': data['rest_amount'],
+                'installments': data['installments']
+            }
 
 
 class SalesReadSerializer(serializers.ModelSerializer):
@@ -80,42 +112,6 @@ class SalesItemsWriteSerializer(serializers.ModelSerializer):
             data = data.copy()
             data['item_id'] = data['item_id'].get('id')
         return super().to_internal_value(data)
-
-
-class PaymentInstallmentSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = models.PaymentInstallment
-        fields = ['id', 'payment_time', 'payment_amount',
-                  'status', 'created_at', 'updated_at']
-
-
-class PaymentScheduleReadSerializer(serializers.ModelSerializer):
-    installments = PaymentInstallmentSerializer(many=True, read_only=True)
-
-    class Meta:
-        model = models.PaymentSchedule
-        fields = ['id', 'advance_payment', 'rest_amount',
-                  'created_at', 'updated_at', 'installments']
-
-    def to_representation(self, instance):
-        data = super().to_representation(instance)
-
-        # Get the sales payment_mode to determine structure
-        sales = instance.sales
-
-        if sales.payment_mode == 'at_a_time':
-            # For at_a_time, only return advance_payment and rest_amount
-            return {
-                'advance_payment': data['advance_payment'],
-                'rest_amount': data['rest_amount']
-            }
-        else:
-            # For installment, return full structure
-            return {
-                'advance_payment': data['advance_payment'],
-                'rest_amount': data['rest_amount'],
-                'installments': data['installments']
-            }
 
 
 class PaymentScheduleWriteSerializer(serializers.ModelSerializer):
@@ -187,10 +183,8 @@ class SalesWriteSerializer(serializers.ModelSerializer):
         # Create payment schedule (for both at_a_time and installment)
         if payment_schedule_data:
             payment_schedule_data['sales'] = sales.id
-            print(payment_schedule_data, '============================>>')
             payment_schedule_serializer = PaymentScheduleWriteSerializer(
                 data=payment_schedule_data)
-            print(payment_schedule_serializer.is_valid())
             if payment_schedule_serializer.is_valid():
                 payment_schedule_serializer.save()
 
@@ -234,3 +228,31 @@ class SalesWriteSerializer(serializers.ModelSerializer):
                 payment_schedule_serializer.save()
 
         return instance
+
+
+class SalesPaymentSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = models.SalesPayment
+        fields = "__all__"
+
+
+class SalesPaymentReadSerializer(serializers.ModelSerializer):
+    sales = SalesReadSerializer(read_only=True)
+
+    class Meta:
+        model = models.SalesPayment
+        fields = "__all__"
+
+
+class SalesInvoiceSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = models.SalesInvoice
+        fields = "__all__"
+
+
+class SalesInvoiceReadSerializer(serializers.ModelSerializer):
+    sales = SalesReadSerializer(read_only=True)
+
+    class Meta:
+        model = models.SalesInvoice
+        fields = "__all__"
