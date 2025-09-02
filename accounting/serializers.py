@@ -206,25 +206,108 @@ class PayslipSerializer(serializers.ModelSerializer):
         model = Payslip
         fields = '__all__'
 
-# PurchaseOrderItem Serializer
 
+# PurchaseOrder Serializers
 
-class PurchaseOrderItemSerializer(serializers.ModelSerializer):
+class PurchaseOrderItemReadSerializer(serializers.ModelSerializer):
+    item = ItemSerializer(read_only=True)
+
     class Meta:
         model = PurchaseOrderItem
-        fields = '__all__'
+        fields = ['id', 'item', 'quantity', 'unit_price', 'subtotal']
 
-# PurchaseOrder Serializer
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        data['subtotal'] = instance.subtotal()
+        return data
 
 
-class PurchaseOrderSerializer(serializers.ModelSerializer):
-    items = PurchaseOrderItemSerializer(many=True, read_only=True)
+class PurchaseOrderReadSerializer(serializers.ModelSerializer):
+    vendor = PartySerializer(read_only=True)
+    items = PurchaseOrderItemReadSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = PurchaseOrder
+        fields = ['id', 'purchase_order', 'po_value', 'tax_value',
+                  'total_including_tax', 'vendor', 'order_date',
+                  'payment_status', 'payment_request_status', 'payment_mode',
+                  'expense_of', 'mapping_status', 'created_at',
+                  'updated_at', 'items']
+
+
+class PurchaseOrderItemWriteSerializer(serializers.ModelSerializer):
+    item_id = serializers.PrimaryKeyRelatedField(
+        queryset=Item.objects.all(), source='item')
+
+    class Meta:
+        model = PurchaseOrderItem
+        fields = ['item_id', 'quantity', 'unit_price']
+
+    def to_internal_value(self, data):
+        # Handle case where item_id is sent as a dict with 'id' key
+        if isinstance(data.get('item_id'), dict):
+            data = data.copy()
+            data['item_id'] = data['item_id'].get('id')
+        return super().to_internal_value(data)
+
+
+class PurchaseOrderWriteSerializer(serializers.ModelSerializer):
+    items = PurchaseOrderItemWriteSerializer(many=True, write_only=True)
 
     class Meta:
         model = PurchaseOrder
         fields = '__all__'
+        extra_kwargs = {
+            'created_at': {'required': False},
+            'updated_at': {'required': False},
+            'mapping_status': {'required': False},
+        }
 
-# PurchaseInvoice Serializer
+    def create(self, validated_data):
+        items_data = validated_data.pop('items')
+        purchase_order = PurchaseOrder.objects.create(**validated_data)
+
+        for item_data in items_data:
+            PurchaseOrderItem.objects.create(
+                purchase_order=purchase_order, **item_data)
+
+        # Calculate total
+        purchase_order.calculate_total()
+        return purchase_order
+
+    def update(self, instance, validated_data):
+        items_data = validated_data.pop('items', None)
+
+        # Update PurchaseOrder fields
+        instance.purchase_order = validated_data.get(
+            'purchase_order', instance.purchase_order)
+        instance.po_value = validated_data.get('po_value', instance.po_value)
+        instance.tax_value = validated_data.get(
+            'tax_value', instance.tax_value)
+        instance.total_including_tax = validated_data.get(
+            'total_including_tax', instance.total_including_tax)
+        instance.vendor = validated_data.get('vendor', instance.vendor)
+        instance.order_date = validated_data.get(
+            'order_date', instance.order_date)
+        instance.payment_status = validated_data.get(
+            'payment_status', instance.payment_status)
+        instance.expense_of = validated_data.get(
+            'expense_of', instance.expense_of)
+        instance.mapping_status = validated_data.get(
+            'mapping_status', instance.mapping_status)
+        instance.updated_at = timezone.now()
+        instance.save()
+
+        if items_data is not None:
+            # Remove existing items and add new ones
+            instance.items.all().delete()
+            for item_data in items_data:
+                PurchaseOrderItem.objects.create(
+                    purchase_order=instance, **item_data)
+
+            instance.calculate_total()
+
+        return instance
 
 
 class PurchaseInvoiceSerializer(serializers.ModelSerializer):

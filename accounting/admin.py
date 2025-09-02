@@ -5,7 +5,7 @@ from .models import (AccountName, Account, Party, Item, BankTransaction,
                      PurchaseRefund, InventoryReceivingVoucher, StockExport,
                      LossAdjustment, OpeningStock, ManufacturingOrder, Asset,
                      License, Component, Consumable, Maintenance, Depreciation,
-                     Bill, BillItem, Check, JournalEntry, JournalEntryLine, Order, OrderItem)
+                     Bill, BillItem, Check, JournalEntry, JournalEntryLine, Order, OrderItem, PurchaseInvoice)
 from django.contrib import admin
 from django.contrib import admin
 from .models import AccountName, Account
@@ -73,12 +73,22 @@ class SalesInvoiceAdmin(admin.ModelAdmin):
     search_fields = ('customer__name',)
 
 
+@admin.register(PurchaseOrder)
+class PurchaseOrderAdmin(admin.ModelAdmin):
+    list_display = ('purchase_order', 'vendor',
+                    'total_including_tax', 'payment_status')
+
+
+@admin.register(PurchaseOrderItem)
+class PurchaseOrderItemAdmin(admin.ModelAdmin):
+    list_display = ('purchase_order', 'item',
+                    'quantity', 'unit_price')
+
+
 @admin.register(PurchaseInvoice)
 class PurchaseInvoiceAdmin(admin.ModelAdmin):
     list_display = ('invoice_no', 'vendor', 'invoice_date',
-                    'invoice_amount', 'payment_status')
-    list_filter = ('payment_status', 'invoice_date')
-    search_fields = ('invoice_no', 'vendor__name')
+                    'invoice_amount', 'purchase_order__payment_status')
 
 
 @admin.register(Asset)
@@ -110,15 +120,18 @@ class JournalEntryAdmin(admin.ModelAdmin):
     search_fields = ('description',)
 
 
+@admin.register(PurchasePayment)
+class PurchasePaymentAdmin(admin.ModelAdmin):
+    list_display = ('date', 'purchase_order', 'amount',
+                    'payment_mode', 'mapping_status', 'status')
+
+
 # Register remaining models with basic ModelAdmin
 admin.site.register(SalesPayment)
 admin.site.register(SalesOrderReturn)
 admin.site.register(SalesRefund)
 admin.site.register(Expense)
 admin.site.register(Payslip)
-admin.site.register(PurchaseOrder)
-admin.site.register(PurchaseOrderItem)
-admin.site.register(PurchasePayment)
 admin.site.register(PurchaseOrderReturn)
 admin.site.register(PurchaseRefund)
 admin.site.register(InventoryReceivingVoucher)

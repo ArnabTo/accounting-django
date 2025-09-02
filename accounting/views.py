@@ -17,7 +17,9 @@ from .serializers import (
     ItemSerializer,
     SalesPaymentSerializer, SalesInvoiceRead, SalesInvoiceWrite, SalesOrderReturnSerializer, SalesRefundSerializer,
     SalesOrderReturnCreateUpdateSerializer, OrderReadSerializer, OrderWriteSerializer,
-    ExpenseReadSerializer, ExpenseWriteSerializer, PayslipSerializer, PurchaseOrderSerializer, PurchaseInvoiceSerializer, PurchasePaymentSerializer,
+    ExpenseReadSerializer, ExpenseWriteSerializer, PayslipSerializer, PurchaseOrderItemReadSerializer, PurchaseOrderItemWriteSerializer,
+    PurchaseOrderReadSerializer, PurchaseOrderWriteSerializer,
+    PurchaseInvoiceSerializer, PurchasePaymentSerializer,
     PurchaseOrderReturnSerializer, PurchaseRefundSerializer, InventoryReceivingVoucherSerializer, StockExportSerializer,
     LossAdjustmentSerializer, OpeningStockSerializer, ManufacturingOrderSerializer, AssetSerializer, LicenseSerializer,
     ComponentSerializer, ConsumableSerializer, MaintenanceSerializer, DepreciationSerializer, BillSerializer, BillCreateUpdateSerializer, CheckSerializer, CheckCreateUpdateSerializer,
@@ -103,7 +105,11 @@ class PayslipViewSet(viewsets.ModelViewSet):
 
 class PurchaseOrderViewSet(viewsets.ModelViewSet):
     queryset = PurchaseOrder.objects.all()
-    serializer_class = PurchaseOrderSerializer
+
+    def get_serializer_class(self):
+        if self.action in ['list', 'retrieve']:
+            return PurchaseOrderReadSerializer
+        return PurchaseOrderWriteSerializer
 
 
 class PurchaseInvoiceViewSet(viewsets.ModelViewSet):

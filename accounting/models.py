@@ -277,44 +277,113 @@ class Payslip(models.Model):
 
 
 class PurchaseOrder(models.Model):
-    order_date = models.DateTimeField(default=timezone.now)
-    vendor = models.ForeignKey(
-        Party, on_delete=models.CASCADE, limit_choices_to={'type': 'vendor'})
-    po_value = models.DecimalField(max_digits=10, decimal_places=2)
+    STATUS = [
+        ('paid', 'Paid'),
+        ('unpaid', 'Unpaid'),
+    ]
+    PAYMENT_MODE = [
+        ('cash', 'Cash'),
+        ('bank', 'Bank'),
+    ]
+    REQUEST_STATUS = [
+        ('pending', 'Pending'),
+        ('approved', 'Approved'),
+        ('rejected', 'Rejected'),
+    ]
+    purchase_order = models.CharField(max_length=100, blank=True, null=True)
+    po_value = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     tax_value = models.DecimalField(max_digits=10, decimal_places=2, default=0)
-    total_including_tax = models.DecimalField(max_digits=10, decimal_places=2)
-    payment_status = models.CharField(max_length=50)
+    total_including_tax = models.DecimalField(
+        max_digits=10, decimal_places=2, default=0)
+    vendor = models.ForeignKey(
+        Party, on_delete=models.CASCADE, null=True, blank=True)
+    order_date = models.DateTimeField(default=timezone.now)
+    payment_status = models.CharField(
+        max_length=50, choices=STATUS, default='unpaid')
+    payment_request_status = models.CharField(
+        max_length=50, choices=REQUEST_STATUS, default='pending')
+    payment_mode = models.CharField(
+        choices=PAYMENT_MODE, max_length=50, null=True, blank=True)
+    expense_of = models.CharField(max_length=50, null=True, blank=True)
     mapping_status = models.CharField(max_length=50, null=True, blank=True)
-    items = models.ManyToManyField(Item, through='PurchaseOrderItem')
     created_at = models.DateTimeField(
         default=timezone.now, null=True, blank=True)
     updated_at = models.DateTimeField(
         default=timezone.now, null=True, blank=True)
 
+    def __str__(self):
+        return f"Order {self.purchase_order} ({self.vendor})"
+
+    def calculate_total(self):
+        result = self.items.aggregate(
+            subtotal=models.Sum(models.F('quantity') * models.F('unit_price')),
+        )
+
+        subtotal = result['subtotal'] or 0
+        tax_amount = (subtotal * self.tax_value) / 100 if self.tax_value else 0
+        total_with_tax = subtotal + tax_amount
+
+        # Only update if values changed
+        update_fields = []
+        if self.po_value != subtotal:
+            self.po_value = subtotal
+            update_fields.append('po_value')
+        if self.total_including_tax != total_with_tax:
+            self.total_including_tax = total_with_tax
+            update_fields.append('total_including_tax')
+
+        if update_fields:
+            self.save(update_fields=update_fields)
+
+        return total_with_tax
+
+    def save(self, *args, **kwargs):
+        # Generate purchase order number if not provided
+        if not self.purchase_order:
+            self.purchase_order = self.generate_po_number()
+        super().save(*args, **kwargs)
+
+    def generate_po_number(self):
+        from django.utils.timezone import now
+        return f"PO-{now().strftime('%Y%m%d-%H%M%S')}"
+
 
 class PurchaseOrderItem(models.Model):
-    purchase_order = models.ForeignKey(PurchaseOrder, on_delete=models.CASCADE)
-    item = models.ForeignKey(Item, on_delete=models.CASCADE)
-    quantity = models.IntegerField(default=1)
-    cost = models.DecimalField(max_digits=10, decimal_places=2)
-    amount = models.DecimalField(max_digits=10, decimal_places=2)
+    purchase_order = models.ForeignKey(
+        PurchaseOrder, on_delete=models.CASCADE, related_name='items', null=True, blank=True)
+    item = models.ForeignKey(
+        Item, on_delete=models.CASCADE, null=True, blank=True)
+    quantity = models.PositiveIntegerField(default=1, null=True, blank=True)
+    unit_price = models.DecimalField(
+        max_digits=10, decimal_places=2, null=True, blank=True)
+
+    def subtotal(self):
+        return self.quantity * self.unit_price
+
+    def __str__(self):
+        return f"{self.item.name if self.item else 'No Item'} x {self.quantity}"
+
+    def save(self, *args, **kwargs):
+        # Set unit_price from item if not provided
+        if self.item and not self.unit_price:
+            self.unit_price = self.item.price
+        super().save(*args, **kwargs)
 
 
-# Could be merged with Bill, but kept separate per description
+# Transactions: Purchase Invoices
+
 class PurchaseInvoice(models.Model):
-    invoice_no = models.CharField(max_length=100)
+    invoice_no = models.CharField(max_length=100, null=True, blank=True)
     vendor = models.ForeignKey(
         Party, on_delete=models.CASCADE, limit_choices_to={'type': 'vendor'})
     contract = models.CharField(max_length=255, null=True, blank=True)
     purchase_order = models.ForeignKey(
         PurchaseOrder, on_delete=models.SET_NULL, null=True, blank=True)
-    invoice_date = models.DateTimeField(default=timezone.now)
+    invoice_date = models.DateTimeField(
+        default=timezone.now, null=True, blank=True)
     recurring_from = models.DateTimeField(null=True, blank=True)
-    invoice_amount = models.DecimalField(max_digits=10, decimal_places=2)
-    tax_value = models.DecimalField(max_digits=10, decimal_places=2, default=0)
-    total_including_tax = models.DecimalField(max_digits=10, decimal_places=2)
-    payment_request_status = models.CharField(max_length=50)
-    payment_status = models.CharField(max_length=50)
+    invoice_amount = models.DecimalField(
+        max_digits=10, decimal_places=2, null=True, blank=True)
     mapping_status = models.CharField(max_length=50, null=True, blank=True)
     created_at = models.DateTimeField(
         default=timezone.now, null=True, blank=True)
@@ -328,7 +397,7 @@ class PurchasePayment(models.Model):
     payment_mode = models.CharField(max_length=50)
     purchase_order = models.ForeignKey(
         PurchaseOrder, on_delete=models.SET_NULL, null=True, blank=True)
-    status = models.CharField(max_length=50)
+    status = models.CharField(max_length=50, default='not mapped')
     mapping_status = models.CharField(max_length=50, null=True, blank=True)
     created_at = models.DateTimeField(
         default=timezone.now, null=True, blank=True)
@@ -499,7 +568,8 @@ class Component(models.Model):
 
 class Consumable(models.Model):
     name = models.CharField(max_length=255)
-    image = models.ImageField(upload_to='consumables/', null=True, blank=True)
+    image = models.ImageField(
+        upload_to='assets/uploads/consumables/', null=True, blank=True)
     category = models.CharField(max_length=255)
     model_no = models.CharField(max_length=100)
     manufacturer = models.CharField(max_length=255)

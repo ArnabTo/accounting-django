@@ -41,6 +41,7 @@ INSTALLED_APPS = [
     'corsheaders',
     # LOCAL APPS
     'accounting',
+    'sales',
 ]
 
 MIDDLEWARE = [
