@@ -126,8 +126,15 @@ class SalesRefundSerializer(serializers.ModelSerializer):
 # Expense Serializer
 
 
-class ExpenseSerializer(serializers.ModelSerializer):
-    account = serializers.PrimaryKeyRelatedField(queryset=Account.objects.all(), required=False, allow_null=True)
+class ExpenseGetSerializer(serializers.ModelSerializer):
+    vendor = PartySerializer()
+    customer = PartySerializer()
+
+    class Meta:
+        model = Expense
+        fields = '__all__'
+
+class ExpensePostSerializer(serializers.ModelSerializer):
     class Meta:
         model = Expense
         fields = '__all__'

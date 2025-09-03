@@ -142,13 +142,39 @@ class ReconciliationAdmin(admin.ModelAdmin):
         return obj.statement.calculate_difference() if obj.statement else None
     get_difference.short_description = 'Statement Difference'
 
+@admin.register(Expense)
+class ExpenseAdmin(admin.ModelAdmin):
+    list_display = ('name', 'expense_category', 'amount', 'expense_date', 'vendor', 'payment_mode')
+    list_filter = ('expense_category', 'expense_date', 'payment_mode', 'vendor')
+    search_fields = ('name', 'note', 'reference', 'vendor__name')
+    ordering = ('-expense_date',)
+    fieldsets = (
+        (None, {
+            'fields': ('name', 'expense_category', 'amount', 'expense_date', 'vendor', 'note')
+        }),
+        ('Additional Details', {
+            'fields': ('customer', 'attach_receipt', 'reference', 'payment_mode')
+        }),
+        ('Financial Details', {
+            'fields': ('currency', 'tax1', 'tax2'),
+            'classes': ('collapse',)
+        }),
+        ('Recurring Settings', {
+            'fields': ('repeat_every',),
+            'classes': ('collapse',)
+        }),
+    )
+    
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        return qs.select_related('vendor', 'customer')
+
 
 # Register remaining models with basic ModelAdmin
 admin.site.register(SalesPayment)
 admin.site.register(InvoiceItem)
 admin.site.register(SalesOrderReturn)
 admin.site.register(SalesRefund)
-admin.site.register(Expense)
 admin.site.register(Payslip)
 admin.site.register(PurchaseOrder)
 admin.site.register(PurchaseOrderItem)
@@ -167,3 +193,6 @@ admin.site.register(Maintenance)
 admin.site.register(Depreciation)
 admin.site.register(BillItem)
 admin.site.register(JournalEntryLine)
+
+
+

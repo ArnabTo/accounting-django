@@ -13,7 +13,7 @@ from .models import (
 from .serializers import (
     AccountSerializer, AccountNameSerializer, BankTransactionSerializer, PartySerializer,
     ItemSerializer, SalesPaymentSerializer, SalesInvoiceSerializer, SalesOrderReturnSerializer, SalesRefundSerializer,
-    ExpenseSerializer, PayslipSerializer, PurchaseOrderSerializer, PurchaseInvoiceSerializer, PurchasePaymentSerializer,
+    ExpenseGetSerializer, ExpensePostSerializer, PayslipSerializer, PurchaseOrderSerializer, PurchaseInvoiceSerializer, PurchasePaymentSerializer,
     PurchaseOrderReturnSerializer, PurchaseRefundSerializer, InventoryReceivingVoucherSerializer, StockExportSerializer,
     LossAdjustmentSerializer, OpeningStockSerializer, ManufacturingOrderSerializer, AssetSerializer, LicenseSerializer,
     ComponentSerializer, ConsumableSerializer, MaintenanceSerializer, DepreciationSerializer, BillSerializer, CheckSerializer,
@@ -68,7 +68,11 @@ class SalesRefundViewSet(viewsets.ModelViewSet):
 
 class ExpenseViewSet(viewsets.ModelViewSet):
     queryset = Expense.objects.all()
-    serializer_class = ExpenseSerializer
+
+    def get_serializer_class(self):
+        if self.action in ['list', 'retrieve']:
+            return ExpenseGetSerializer
+        return ExpensePostSerializer
 
 
 class PayslipViewSet(viewsets.ModelViewSet):

@@ -217,18 +217,30 @@ class SalesRefund(models.Model):
 
 
 class Expense(models.Model):
-    name = models.CharField(max_length=255)  # e.g., expense description
-    date = models.DateField(default=timezone.now)
+    attach_receipt = models.FileField(upload_to='expenses/', null=True, blank=True)
+    vendor = models.ForeignKey(
+        Party, on_delete=models.CASCADE, blank=True, null=True, related_name='vendor_expenses')
+    name = models.CharField(max_length=255, blank=True, null=True)
+    note = models.TextField(blank=True, null=True)
+    expense_category = models.CharField(max_length=255, blank=True, null=True)
+    expense_date = models.DateField(default=timezone.now)
     amount = models.DecimalField(max_digits=10, decimal_places=2)
-    category = models.CharField(max_length=255)
-    payment_mode = models.CharField(max_length=50)
-    invoice = models.FileField(upload_to='expenses/', null=True, blank=True)
-    status = models.CharField(max_length=50)
-    mapping_status = models.CharField(max_length=50, null=True, blank=True)
-    account = models.ForeignKey(
-        Account, on_delete=models.SET_NULL, null=True, blank=True)  # Debit/credit link
-    created_at = models.DateTimeField(default=timezone.now)
-    updated_at = models.DateTimeField(default=timezone.now)
+    customer = models.ForeignKey(
+        Party, on_delete=models.CASCADE, blank=True, null=True, related_name='customer_expenses')
+    # Advance options
+    currency = models.CharField(max_length=3, default='USD')
+    tax1 = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    tax2 = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    payment_mode = models.CharField(max_length=50, choices=[
+        ('cash', 'Cash'),
+        ('credit_card', 'Credit Card'),
+        ('bank_transfer', 'Bank Transfer'),
+    ], default='cash')
+    reference = models.CharField(max_length=255, blank=True, null=True)
+    repeat_every = models.CharField(max_length=50, blank=True, null=True, default='1 week')
+
+    def __str__(self):
+        return f"Expense {self.name} - {self.amount}"
 
 # Transactions: Payslips (Payroll)
 
@@ -713,3 +725,4 @@ class Reconciliation(models.Model):
     
     def __str__(self):
         return f"Reconciliation for {self.statement} - {self.status}"
+    
