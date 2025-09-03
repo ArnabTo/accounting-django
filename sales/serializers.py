@@ -16,9 +16,42 @@ class PlotSerializer(serializers.ModelSerializer):
 
 
 class ItemSerializer(serializers.ModelSerializer):
+    plot_description = PlotSerializer(read_only=False)
+    brand = BrandSerializer(read_only=False)
+
     class Meta:
         model = models.Item
         fields = '__all__'
+
+    def create(self, validated_data):
+        plot_description = validated_data.pop('plot_description', None)
+        brand = validated_data.pop('brand', None)
+
+        if plot_description:
+            plot_description_instance = models.PlotDescription.objects.create(
+                **plot_description)
+            validated_data['plot_description'] = plot_description_instance
+
+        if brand:
+            brand_instance = models.Brands.objects.create(**brand)
+            validated_data['brand'] = brand_instance
+
+        return models.Item.objects.create(**validated_data)
+
+    def update(self, instance, validated_data):
+        plot_description = validated_data.pop('plot_description', None)
+        brand = validated_data.pop('brand', None)
+
+        if plot_description:
+            plot_description_instance = models.PlotDescription.objects.create(
+                **plot_description)
+            validated_data['plot_description'] = plot_description_instance
+
+        if brand:
+            brand_instance = models.Brands.objects.create(**brand)
+            validated_data['brand'] = brand_instance
+
+        return models.Item.objects.create(**validated_data)
 
 
 class ItemReadSerializer(serializers.ModelSerializer):
@@ -33,7 +66,7 @@ class ItemReadSerializer(serializers.ModelSerializer):
 
 
 class SalesItemsReadSerializer(serializers.ModelSerializer):
-    item = ItemSerializer(read_only=True)
+    item = ItemReadSerializer(read_only=True)
 
     class Meta:
         model = models.SalesItems
@@ -68,14 +101,12 @@ class PaymentScheduleReadSerializer(serializers.ModelSerializer):
         sales = instance.sales
 
         if sales.payment_mode == 'at_a_time':
-            print('here')
             # For at_a_time, only return advance_payment and rest_amount
             return {
                 'advance_payment': data['advance_payment'],
                 'rest_amount': data['rest_amount']
             }
         else:
-            print('there')
             # For installment, return full structure
             return {
                 'advance_payment': data['advance_payment'],
@@ -123,7 +154,6 @@ class PaymentScheduleWriteSerializer(serializers.ModelSerializer):
         fields = ['advance_payment', 'rest_amount', 'installments', 'sales']
 
     def create(self, validated_data):
-        print(validated_data)
         installments_data = validated_data.pop('installments', [])
         # Ensure sales is provided in validated_data
         if 'sales' not in validated_data:
@@ -236,8 +266,16 @@ class SalesPaymentSerializer(serializers.ModelSerializer):
         fields = "__all__"
 
 
-class SalesPaymentReadSerializer(serializers.ModelSerializer):
+class SalesInvoiceReadSerializer(serializers.ModelSerializer):
     sales = SalesReadSerializer(read_only=True)
+
+    class Meta:
+        model = models.SalesInvoice
+        fields = "__all__"
+
+
+class SalesPaymentReadSerializer(serializers.ModelSerializer):
+    invoice = SalesInvoiceReadSerializer(read_only=True)
 
     class Meta:
         model = models.SalesPayment
@@ -245,14 +283,6 @@ class SalesPaymentReadSerializer(serializers.ModelSerializer):
 
 
 class SalesInvoiceSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = models.SalesInvoice
-        fields = "__all__"
-
-
-class SalesInvoiceReadSerializer(serializers.ModelSerializer):
-    sales = SalesReadSerializer(read_only=True)
-
     class Meta:
         model = models.SalesInvoice
         fields = "__all__"

@@ -180,7 +180,22 @@ class SalesInvoice(models.Model):
 
 class SalesPayment(models.Model):
     date = models.DateTimeField(default=timezone.now)
+
     amount = models.DecimalField(max_digits=10, decimal_places=2)
+    payment_mode = models.CharField(max_length=50)  # e.g., cash, card
+    in_words = models.CharField(max_length=255, null=True, blank=True)
+    bank = models.CharField(max_length=255, null=True, blank=True)
+    branch = models.CharField(max_length=255, null=True, blank=True)
+
+    name_of_purchaser = models.CharField(max_length=255, null=True, blank=True)
+    against = models.CharField(max_length=255, null=True, blank=True)
+    plot_no = models.CharField(max_length=255, null=True, blank=True)
+    road_no = models.CharField(max_length=255, null=True, blank=True)
+    block = models.CharField(max_length=255, null=True, blank=True)
+    area = models.CharField(max_length=255, null=True, blank=True)
+    project = models.CharField(max_length=255, null=True, blank=True)
+    remarks = models.TextField(null=True, blank=True)
+
     payment_mode = models.CharField(max_length=50)
     invoice = models.ForeignKey(
         'SalesInvoice', on_delete=models.SET_NULL, null=True, blank=True, related_name='sales_payments')
