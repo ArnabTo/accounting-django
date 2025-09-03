@@ -18,7 +18,7 @@ class AccountNameAdmin(admin.ModelAdmin):
     search_fields = ('name',)
     ordering = ('name',)
 
-
+# added
 @admin.register(Account)
 class AccountAdmin(admin.ModelAdmin):
     list_display = ('id', 'get_parent_account_name',
