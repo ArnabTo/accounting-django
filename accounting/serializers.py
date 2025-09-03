@@ -186,7 +186,8 @@ class SalesRefundSerializer(serializers.ModelSerializer):
 
 
 class ExpenseReadSerializer(serializers.ModelSerializer):
-    account = AccountSerializer(read_only=True)
+    vendor = PartySerializer(read_only=True)
+    customer = PartySerializer(read_only=True)
 
     class Meta:
         model = Expense

@@ -197,9 +197,9 @@ def capture_old_expense(sender, instance, **kwargs):
 @receiver(post_save, sender=Expense)
 def update_expense_balance(sender, instance, created, **kwargs):
     net_delta = instance.amount - instance._old_amount if not created else instance.amount
-    if instance.account:
+    if instance.payment_account:
         # Debit expense account
-        update_account_balance(instance.account, net_delta)
+        update_account_balance(instance.payment_account, net_delta)
 
 
 @receiver(pre_delete, sender=Expense)
