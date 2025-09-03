@@ -257,7 +257,7 @@ class Expense(models.Model):
     name = models.CharField(max_length=255, blank=True, null=True)
     note = models.TextField(blank=True, null=True)
     expense_category = models.CharField(max_length=255, blank=True, null=True)
-    expense_date = models.DateField(default=timezone.now)
+    expense_date = models.DateTimeField(default=timezone.now)
     amount = models.DecimalField(max_digits=10, decimal_places=2)
 
     currency = models.CharField(max_length=3, default='USD')
