@@ -1,7 +1,8 @@
 from django.db import models
 from django.utils import timezone
+from django.db.models.signals import pre_save, post_save, pre_delete
+from django.dispatch import receiver
 
-# Create your models here.
 
 
 class AccountName(models.Model):
@@ -130,13 +131,31 @@ class BankTransaction(models.Model):
 
 class SalesPayment(models.Model):
     date = models.DateField(default=timezone.now)
+
+    # Payment details
     amount = models.DecimalField(max_digits=10, decimal_places=2)
     payment_mode = models.CharField(max_length=50)  # e.g., cash, card
+    in_words = models.CharField(max_length=255, null=True, blank=True)
+    bank = models.CharField(max_length=255, null=True, blank=True)
+    branch = models.CharField(max_length=255, null=True, blank=True)
+
+    # Asset against payment
+    against = models.CharField(max_length=255, null=True, blank=True)
+    plot_no = models.CharField(max_length=255, null=True, blank=True)
+    road_no = models.CharField(max_length=255, null=True, blank=True)
+    block = models.CharField(max_length=255, null=True, blank=True)
+    area = models.CharField(max_length=255, null=True, blank=True)
+    project = models.CharField(max_length=255, null=True, blank=True)
+    remarks = models.TextField(null=True, blank=True)
     invoice = models.ForeignKey(
         'SalesInvoice', on_delete=models.SET_NULL, null=True, blank=True, related_name='payments')
     status = models.CharField(max_length=50, default='paid')
+
     # Placeholder for integration/mapping
     mapping_status = models.CharField(max_length=50, null=True, blank=True)
+    name_of_purchaser = models.CharField(max_length=255, null=True, blank=True)
+    address = models.TextField(null=True, blank=True)
+
     created_at = models.DateTimeField(default=timezone.now)
     updated_at = models.DateTimeField(default=timezone.now)
 
@@ -156,6 +175,9 @@ class SalesInvoice(models.Model):
         Account, on_delete=models.SET_NULL, null=True, blank=True, related_name='credit_invoices')
     created_at = models.DateTimeField(default=timezone.now)
     updated_at = models.DateTimeField(default=timezone.now)
+
+    def __str__(self):
+        return f"Invoice {self.id} for {self.customer.name}"
 
 
 # Intermediate for line items in invoices/bills/etc.
@@ -530,3 +552,164 @@ class JournalEntryLine(models.Model):
     debit = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     credit = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     description = models.TextField(null=True, blank=True)
+
+
+
+# Reconciliation Models
+class ReconcileStatement(models.Model):
+    account = models.ForeignKey(Account, on_delete=models.CASCADE)
+    beginning_balance = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    ending_balance = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    ending_date = models.DateField(default=timezone.now)
+    created_at = models.DateTimeField(default=timezone.now)
+
+    def save(self, *args, **kwargs):
+        # If this is a new record (no ID yet)
+        if not self.pk:
+            # Get the most recent statement for this account
+            previous_statement = ReconcileStatement.objects.filter(
+                account=self.account,
+                ending_date__lt=self.ending_date
+            ).order_by('-ending_date').first()
+            
+            # Set beginning balance to previous statement's ending balance
+            if previous_statement:
+                self.beginning_balance = previous_statement.ending_balance
+            else:
+                self.beginning_balance = 0
+                
+        super().save(*args, **kwargs)
+    
+    @property
+    def cleared_balance(self):
+        """Calculate cleared balance: beginning_balance - payments + deposits"""
+        cleared_transactions = self.transactions.filter(is_cleared=True)
+        total_payments = cleared_transactions.aggregate(
+            total=models.Sum('payment_amount')
+        )['total'] or 0
+        total_deposits = cleared_transactions.aggregate(
+            total=models.Sum('deposit_amount')
+        )['total'] or 0
+        return self.beginning_balance - total_payments + total_deposits
+    
+    @property
+    def total_payments(self):
+        """Get total cleared payments"""
+        cleared_transactions = self.transactions.filter(is_cleared=True)
+        total = cleared_transactions.aggregate(
+            total=models.Sum('payment_amount')
+        )['total']
+        return total if total is not None else 0
+    
+    @property
+    def total_deposits(self):
+        """Get total cleared deposits"""
+        cleared_transactions = self.transactions.filter(is_cleared=True)
+        total = cleared_transactions.aggregate(
+            total=models.Sum('deposit_amount')
+        )['total']
+        return total if total is not None else 0
+    
+    def calculate_difference(self):
+        """Calculate difference between ending balance and cleared balance"""
+        return self.ending_balance - self.cleared_balance
+    
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        # Check if there's a related reconciliation
+        try:
+            reconciliation = self.reconciliation
+            difference = self.calculate_difference()
+            # If difference is 0, update reconciliation status
+            if abs(difference) < 0.01:  # Using small threshold for floating point comparison
+                if reconciliation.status != 'completed':
+                    reconciliation.status = 'completed'
+                    reconciliation.save(update_fields=['status'])
+            else:
+                if reconciliation.status != 'pending':
+                    reconciliation.status = 'pending'
+                    reconciliation.save(update_fields=['status'])
+        except Reconciliation.DoesNotExist:
+            pass  # No reconciliation exists yet
+    
+    def __str__(self):
+        return f"Statement for {self.account} - {self.ending_date}"
+
+class ReconcileTransaction(models.Model):
+    TRANSACTION_TYPES = [
+        ('deposit', 'Deposit'),
+        ('cheque_expense', 'Cheque Expense'),
+    ]
+    
+    statement = models.ForeignKey(ReconcileStatement, on_delete=models.CASCADE, related_name='transactions', null=True, blank=True)
+    date = models.DateField(default=timezone.now)
+    transaction_type = models.CharField(max_length=20, choices=TRANSACTION_TYPES, default='deposit')
+    account = models.ForeignKey('Account', on_delete=models.CASCADE)
+    payee = models.ForeignKey('Party', on_delete=models.SET_NULL, null=True, blank=True)
+    description = models.CharField(max_length=255)
+    payment_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    deposit_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    is_cleared = models.BooleanField(default=False)
+    
+    def __str__(self):
+        return f"{self.transaction_type} - {self.date} - {self.description}"
+    
+    @receiver(pre_save, sender='accounting.ReconcileTransaction')
+    def capture_old_values(sender, instance, **kwargs):
+        """Store old values before save to calculate the difference"""
+        if instance.pk:  # If this is an update
+            try:
+                old = sender.objects.get(pk=instance.pk)
+                instance._old_payment = old.payment_amount
+                instance._old_deposit = old.deposit_amount
+                instance._old_cleared = old.is_cleared
+            except sender.DoesNotExist:
+                instance._old_payment = 0
+                instance._old_deposit = 0
+                instance._old_cleared = False
+        else:  # If this is a new instance
+            instance._old_payment = 0
+            instance._old_deposit = 0
+            instance._old_cleared = False
+
+    @receiver(post_save, sender='accounting.ReconcileTransaction')
+    def update_statement(sender, instance, created, **kwargs):
+        """Update the related ReconcileStatement's computed values"""
+        if instance.statement:
+            # Force refresh the cached properties by saving the statement
+            instance.statement.save()
+            
+            # Refresh from db to ensure we have latest values
+            instance.statement.refresh_from_db()
+
+    @receiver(pre_delete, sender='accounting.ReconcileTransaction')
+    def handle_delete(sender, instance, **kwargs):
+        """Handle updates when a transaction is deleted"""
+        if instance.statement:
+            # Save the statement to trigger recalculation of properties
+            instance.statement.save()
+
+class Reconciliation(models.Model):
+    RECONCILIATION_STATUS = [
+        ('pending', 'Pending'),
+        ('completed', 'Completed'),
+        ('discrepancy', 'Has Discrepancy')
+    ]
+    
+    statement = models.OneToOneField(ReconcileStatement, on_delete=models.CASCADE, related_name='reconciliation')
+    reconciled_at = models.DateTimeField(default=timezone.now)
+    status = models.CharField(max_length=20, choices=RECONCILIATION_STATUS, default='pending')
+    adjustment_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    
+    def save(self, *args, **kwargs):
+        if self.statement:
+            difference = self.statement.calculate_difference()
+            # If difference is 0, mark as completed
+            if abs(difference) < 0.01:  # Using small threshold for floating point comparison
+                self.status = 'completed'
+            else:
+                self.status = 'pending'
+        super().save(*args, **kwargs)
+    
+    def __str__(self):
+        return f"Reconciliation for {self.statement} - {self.status}"

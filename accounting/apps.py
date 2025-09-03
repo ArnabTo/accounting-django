@@ -6,4 +6,4 @@ class AccountingConfig(AppConfig):
     name = 'accounting'
 
     def ready(self):
-        import accounting.signals
+        pass  # No signals to import

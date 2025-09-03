@@ -15,6 +15,7 @@ from .views import (
     ComponentViewSet, ConsumableViewSet, MaintenanceViewSet,
     DepreciationViewSet, BillViewSet, BillItemViewSet, CheckViewSet,
     JournalEntryViewSet,
+    ReconcileStatementViewSet, ReconcileTransactionViewSet, ReconciliationViewSet
 )
 
 router = DefaultRouter()
@@ -50,6 +51,9 @@ router.register(r'bills', BillViewSet)
 router.register(r'bill-items', BillItemViewSet)
 router.register(r'checks', CheckViewSet)
 router.register(r'journal-entries', JournalEntryViewSet)
+router.register(r'reconcile-statements', ReconcileStatementViewSet)
+router.register(r'reconcile-transactions', ReconcileTransactionViewSet)
+router.register(r'reconciliations', ReconciliationViewSet)
 
 urlpatterns = [
     path('', include(router.urls)),

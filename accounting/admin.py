@@ -5,7 +5,7 @@ from .models import (AccountName, Account, Party, Item, BankTransaction,
                      PurchaseRefund, InventoryReceivingVoucher, StockExport,
                      LossAdjustment, OpeningStock, ManufacturingOrder, Asset,
                      License, Component, Consumable, Maintenance, Depreciation,
-                     Bill, BillItem, Check, JournalEntry, JournalEntryLine)
+                     Bill, BillItem, Check, JournalEntry, JournalEntryLine, ReconcileStatement, ReconcileTransaction, Reconciliation)
 from django.contrib import admin
 from django.contrib import admin
 from .models import AccountName, Account
@@ -44,6 +44,8 @@ class ItemAdmin(admin.ModelAdmin):
     list_display = ('name', 'type', 'sku', 'price', 'quantity', 'category')
     list_filter = ('type', 'category')
     search_fields = ('name', 'sku')
+
+
 
 
 @admin.register(BankTransaction)
@@ -96,6 +98,49 @@ class JournalEntryAdmin(admin.ModelAdmin):
     list_display = ('date', 'description')
     list_filter = ('date',)
     search_fields = ('description',)
+
+@admin.register(ReconcileStatement)
+class ReconcileStatementAdmin(admin.ModelAdmin):
+    list_display = ('account', 'beginning_balance', 'ending_balance', 'ending_date', 
+                   'get_cleared_balance', 'get_difference', 'get_reconciliation_status')
+    list_filter = ('account', 'ending_date')
+    readonly_fields = ('beginning_balance', 'get_cleared_balance', 'get_difference')
+    search_fields = ('account__name',)
+    
+    def get_cleared_balance(self, obj):
+        return obj.cleared_balance
+    get_cleared_balance.short_description = 'Cleared Balance'
+    
+    def get_difference(self, obj):
+        return obj.calculate_difference()
+    get_difference.short_description = 'Difference'
+    
+    def get_reconciliation_status(self, obj):
+        try:
+            return obj.reconciliation.status
+        except Reconciliation.DoesNotExist:
+            return 'No Reconciliation'
+    get_reconciliation_status.short_description = 'Reconciliation Status'
+
+
+@admin.register(ReconcileTransaction)
+class ReconcileTransactionAdmin(admin.ModelAdmin):
+    list_display = ('statement', 'date', 'transaction_type', 'description', 
+                   'payment_amount', 'deposit_amount', 'is_cleared')
+    list_filter = ('statement', 'transaction_type', 'is_cleared', 'date')
+    search_fields = ('description', 'statement__account__name')
+
+
+@admin.register(Reconciliation)
+class ReconciliationAdmin(admin.ModelAdmin):
+    list_display = ('statement', 'reconciled_at', 'status', 'adjustment_amount', 'get_difference')
+    list_filter = ('status', 'reconciled_at')
+    readonly_fields = ('status',)  # Status is automatically set
+    search_fields = ('statement__account__name',)
+    
+    def get_difference(self, obj):
+        return obj.statement.calculate_difference() if obj.statement else None
+    get_difference.short_description = 'Statement Difference'
 
 
 # Register remaining models with basic ModelAdmin

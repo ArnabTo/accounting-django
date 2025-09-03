@@ -8,7 +8,7 @@ from .models import (
     PurchaseInvoice, PurchasePayment, PurchaseOrderReturn, PurchaseRefund,
     InventoryReceivingVoucher, StockExport, LossAdjustment, OpeningStock,
     ManufacturingOrder, Asset, License, Component, Consumable, Maintenance,
-    Depreciation, Bill, BillItem, Check, JournalEntry, JournalEntryLine
+    Depreciation, Bill, BillItem, Check, JournalEntry, JournalEntryLine, ReconcileStatement, ReconcileTransaction, Reconciliation
 )
 
 
@@ -365,3 +365,84 @@ class SalesRefundSerializer(serializers.ModelSerializer):
     class Meta:
         model = SalesRefund
         fields = '__all__'
+
+# Reconciliation Serializers
+class ReconcileTransactionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ReconcileTransaction
+        fields = [
+            'id', 'statement', 'date', 'transaction_type',
+            'account', 'payee', 'description',
+            'payment_amount', 'deposit_amount', 'is_cleared'
+        ]
+
+class ReconcileStatementSerializer(serializers.ModelSerializer):
+    cleared_balance = serializers.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        read_only=True
+    )
+    difference = serializers.DecimalField(
+        max_digits=10, 
+        decimal_places=2,
+        read_only=True,
+        source='calculate_difference'
+    )
+    total_payments = serializers.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        read_only=True
+    )
+    total_deposits = serializers.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        read_only=True
+    )
+    reconciliation_status = serializers.CharField(
+        source='reconciliation.status',
+        read_only=True
+    )
+    
+    class Meta:
+        model = ReconcileStatement
+        fields = [
+            'id', 'account', 'beginning_balance',
+            'ending_balance', 'ending_date', 'cleared_balance',
+            'created_at', 'difference', 'total_payments',
+            'total_deposits', 'reconciliation_status'
+        ]
+        read_only_fields = ['beginning_balance']  # Make beginning_balance read-only
+
+class ReconciliationSerializer(serializers.ModelSerializer):
+    statement_difference = serializers.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        read_only=True,
+        source='statement.calculate_difference'
+    )
+    
+    def validate(self, data):
+        """
+        Check if the reconciliation should be marked as complete
+        based on statement difference
+        """
+        if self.instance:  # If this is an update
+            statement = data.get('statement', self.instance.statement)
+        else:  # If this is a create
+            statement = data.get('statement')
+            
+        if statement:
+            difference = statement.calculate_difference()
+            if abs(difference) < 0.01:  # Using small threshold for floating point comparison
+                data['status'] = 'completed'
+            else:
+                data['status'] = 'pending'
+        return data
+
+    class Meta:
+        model = Reconciliation
+        fields = [
+            'id', 'statement', 'reconciled_at',
+            'status', 'adjustment_amount', 'statement_difference'
+        ]
+        read_only_fields = ['status']  # Status is automatically set
